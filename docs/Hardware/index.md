@@ -8,7 +8,9 @@
 
 **下载版本9.0.3！不要下载最新版。**
 
-[KiCad 官方下载页面](https://downloads.kicad.org/kicad/windows/explore/stable)
+- [Windows 下载页面](https://downloads.kicad.org/kicad/windows/explore/stable)
+- [macOS 下载页面](https://downloads.kicad.org/kicad/macos/explore/stable)
+- [Linux 下载页面](https://downloads.kicad.org/kicad/linux/explore/stable)
 
 ### STM32CubeMX
 

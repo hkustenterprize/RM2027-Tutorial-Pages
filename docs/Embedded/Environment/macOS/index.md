@@ -1,30 +1,55 @@
-# Embedded 环境配置 - macOS
+# 嵌入式 环境配置 - macOS
 
 > **适用系统：** macOS（Intel 或 Apple Silicon）
 
-## 1. 准备安装包
+## 所需组件概览
 
-从以下 Google Drive 文件夹下载 `Packages-MacOS`：
+跟随本教程，你将会安装以下组件：
 
-[Packages-MacOS - Google Drive](https://drive.google.com/drive/folders/14r4TiqKxl6bIqSqmbTKAaHJJGJwpHtlJ?usp=sharing)
+- Homebrew
+- Git
+- GNU Make
+- CMake
+- Ninja
+- GCC
+- Arm GNU Toolchain
+- Visual Studio Code（最新版）
+- STM32CubeMX（最新版，不是 STM32CubeMX2）
+- SEGGER J-Link Software and Documentation Pack（V7.92c）
+- SEGGER Ozone（V3.30b）
+- SEGGER SystemView
 
-> **官方下载页面**
->
-> - [STM32CubeMX - STMicroelectronics](https://www.st.com/en/development-tools/stm32cubemx.html)
-> - [J-Link / J-Trace - SEGGER](https://www.segger.com/downloads/jlink)
+## 1. 下载所需安装包
+
+**请严格按照下方标注选择对应软件版本。对于指定了固定版本的软件，不要直接下载最新版。**
+
+Intel 芯片请选择 x86_64 版本；Apple Silicon 芯片请选择 ARM64 版本。
+
+### 1.1 Visual Studio Code
+
+从 [Visual Studio Code 官方网站](https://code.visualstudio.com/) 下载适用于 macOS 和当前芯片架构的最新安装包。
+
+### 1.2 STM32CubeMX
+
+打开 [STM32CubeMX 官方下载页面](https://www.st.com/en/development-tools/stm32cubemx.html)，登录或注册 ST 账号，然后下载适用于 macOS 和当前芯片架构的最新版本。
+
+请下载 **STM32CubeMX**，不要下载 STM32CubeMX 2。
+
+### 1.3 SEGGER J-Link
+
+从 [J-Link 官方下载页面](https://www.segger.com/downloads/jlink) 下载适用于 macOS 和当前芯片架构的 **V7.92c** 版本。
+
+### 1.4 SEGGER Ozone
+
+从 [Ozone 官方下载页面](https://www.segger.com/downloads/jlink#Ozone) 下载适用于 macOS 和当前芯片架构的 **V3.30b** 版本。
+
+### 1.5 SEGGER SystemView
+
+从 [SystemView 官方下载页面](https://www.segger.com/downloads/jlink#SystemView) 下载适用于 macOS 和当前芯片架构的版本。
 
 ## 2. 安装 Visual Studio Code
 
-根据 Mac 的芯片类型选择对应的安装包：
-
-- Intel 芯片：`VSCode-darwin-intel.zip`
-- Apple Silicon 芯片（例如 M1、M2）：`VSCode-darwin-apple-silicon.zip`
-
-解压对应的安装包并安装 Visual Studio Code。
-
-> **官方下载页面**
->
-> - [Visual Studio Code](https://code.visualstudio.com/)
+解压第 1 节下载的安装包并安装 Visual Studio Code。
 
 ## 3. 安装 Homebrew
 
@@ -175,20 +200,19 @@ arm-none-eabi-g++ --version
 
 ### 6.1 STM32CubeMX
 
-解压 `SetupSTM32CubeMX-6.15.0.app.tar.gz`，然后打开安装程序并按照提示完成安装。
+- 解压并打开第 1 节下载的 STM32CubeMX 安装程序，按照提示完成安装。
 
 ### 6.2 SEGGER J-Link
 
-根据 Mac 的芯片类型选择对应的安装包：
-
-- Intel 芯片：`JLink_MacOSX_V792c_x86_64.pkg`
-- Apple Silicon 芯片：`JLink_MacOSX_V792c_arm64.pkg`
-
-打开安装包并按照提示完成安装。
+- 打开第 1 节下载的 J-Link V7.92c 安装包，按照提示完成安装。
 
 ### 6.3 SEGGER Ozone
 
-打开 `Ozone_MacOSX_V330b_x86_64.pkg`，按照提示完成安装。
+- 打开第 1 节下载的 Ozone V3.30b 安装包，按照提示完成安装。
+
+### 6.4 SEGGER SystemView
+
+- 打开第 1 节下载的 SystemView 安装包，按照提示完成安装。
 
 ## 7. 使用提示
 
@@ -198,4 +222,4 @@ arm-none-eabi-g++ --version
 
 ## 8. 下一步
 
-环境配置完成。接下来请继续进行 [环境验证](<../Verify/RM Embedded Tutorial 环境验证.md>)。
+环境配置完成。接下来请继续进行 [环境验证](<../Verify/index.md>)。

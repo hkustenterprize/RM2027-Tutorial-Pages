@@ -1,8 +1,8 @@
-site_name: HKUST ENTERPRIZE Embedded Tutorial Site
-site_description: Embedded Tutorial docs
+site_name: HKUST ENTERPRIZE RM2027 Tutorial Site
+site_description: ENTERPRIZE tutorials
 site_url: https://tutorial.robomaster.hk/
-repo_name: hkustenterprize/RM2027-Tutorial-Embedded-Docs
-repo_url: https://github.com/hkustenterprize/RM2027-Tutorial-Embedded-Docs
+repo_name: hkustenterprize/RM2027-Tutorial-Pages
+repo_url: https://github.com/hkustenterprize/RM2027-Tutorial-Pages
 edit_uri: edit/main/docs/
 
 theme:
@@ -22,9 +22,7 @@ theme:
         icon: material/brightness-4
         name: 切换到浅色模式
   features:
-    - content.action.edit
     - content.code.copy
-    - navigation.indexes
     - navigation.sections
     - navigation.top
     - search.highlight
@@ -37,14 +35,18 @@ plugins:
         - en
 
 nav:
-  - 首页:
-      - index.md
+  - 首页: index.md
+  - 机械:
+      - 机械部门主页: Mechanical/index.md
+  - 硬件:
+      - 硬件部门主页: Hardware/index.md
+  - 嵌入式:
+      - 嵌入式部门主页: Embedded/index.md
       - 开发环境配置:
-          - Environment/index.md
-          - Windows: "Environment/Windows/RM Embedded Tutorial 环境配置 Windows.md"
-          - macOS: "Environment/macOS/RM Embedded Tutorial 环境配置 macOS.md"
-          - Linux: "Environment/Linux/RM Embedded Tutorial 环境配置 Linux.md"
-          - 环境验证: "Environment/Verify/RM Embedded Tutorial 环境验证.md"
+          - Windows: "Embedded/Environment/Windows/index.md"
+          - macOS: "Embedded/Environment/macOS/index.md"
+          - Linux: "Embedded/Environment/Linux/index.md"
+          - 环境验证: "Embedded/Environment/Verify/index.md"
 
 markdown_extensions:
   - attr_list

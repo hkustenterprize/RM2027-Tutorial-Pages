@@ -1,8 +1,50 @@
-# Embedded 环境配置 - Windows
+# 嵌入式 环境配置 - Windows
 
 > **适用系统：** Windows 11 x64
 
-## 1. 打开管理员终端
+## 所需组件概览
+
+跟随本教程，你将会安装以下组件：
+
+- Git
+- GitHub CLI
+- GNU Make
+- CMake
+- Ninja
+- Arm GNU Toolchain
+- Visual Studio Code（最新版）
+- STM32CubeMX（最新版，不是 STM32CubeMX2）
+- SEGGER J-Link Software and Documentation Pack（V7.92c）
+- SEGGER Ozone（V3.30b）
+- SEGGER SystemView
+
+## 1. 下载所需安装包
+
+**请严格按照下方标注选择对应软件版本。对于指定了固定版本的软件，不要直接下载最新版。**
+
+### 1.1 Visual Studio Code
+
+从 [Visual Studio Code 官方网站](https://code.visualstudio.com/) 下载适用于 Windows x64 的最新安装包。
+
+### 1.2 STM32CubeMX
+
+打开 [STM32CubeMX 官方下载页面](https://www.st.com/en/development-tools/stm32cubemx.html)，登录或注册 ST 账号，然后下载适用于 Windows x64 的最新版本。
+
+请下载 **STM32CubeMX**，不要下载 STM32CubeMX2。
+
+### 1.3 SEGGER J-Link
+
+从 [J-Link 官方下载页面](https://www.segger.com/downloads/jlink) 下载适用于 Windows x64 的 **V7.92c** 版本。
+
+### 1.4 SEGGER Ozone
+
+从 [Ozone 官方下载页面](https://www.segger.com/downloads/jlink#Ozone) 下载适用于 Windows x64 的 **V3.30b** 版本。
+
+### 1.5 SEGGER SystemView
+
+从 [SystemView 官方下载页面](https://www.segger.com/downloads/jlink#SystemView) 下载适用于 Windows x64 的版本。
+
+## 2. 打开管理员终端
 
 - 在开始菜单按钮处 `右键`。
 - 在右键菜单中选择 `终端（管理员）`。
@@ -19,9 +61,9 @@
 
 这便是 PowerShell 终端。接下来的大部分安装操作都将在终端中进行。
 
-## 2. 配置 Git
+## 3. 配置 Git
 
-### 2.1 安装 Git 与 GitHub CLI
+### 3.1 安装 Git 与 GitHub CLI
 
 - 在 PowerShell 中输入以下命令：
 
@@ -41,7 +83,7 @@ winget install -e Git.Git GitHub.cli --accept-package-agreements --accept-source
 
 ![](RM%20Embedded%20Tutorial%20环境配置%20Windows.assets/Pasted%20image%2020260831215136.png)
 
-### 2.2 使用 HTTPS 登录 GitHub
+### 3.2 使用 HTTPS 登录 GitHub
 
 **终端操作**
 
@@ -98,7 +140,7 @@ gh auth login
 
 ![](RM%20Embedded%20Tutorial%20环境配置%20Windows.assets/Pasted%20image%2020260831161550.png)
 
-### 2.3 设置 Git 用户信息
+### 3.3 设置 Git 用户信息
 
 在终端中分别执行以下命令，将姓名和邮箱**替换为自己的信息**：
 
@@ -127,9 +169,9 @@ git config --global --get user.email
 
 ![](RM%20Embedded%20Tutorial%20环境配置%20Windows.assets/Screenshot%202026-09-01%20000233.png)
 
-## 3. 配置 C/C++ 嵌入式编译工具链
+## 4. 配置 C/C++ 嵌入式编译工具链
 
-### 3.1 安装工具链
+### 4.1 安装工具链
 
 - 点击终端窗口上方标签栏右侧的 `+` 按钮，新建一个 PowerShell 标签页。
 - 输入：
@@ -154,7 +196,7 @@ winget install -e ezwinports.make Kitware.CMake Ninja-build.Ninja Arm.GnuArmEmbe
 
 安装完成后，关闭管理员终端的所有标签页。
 
-### 3.2 验证工具链
+### 4.2 验证工具链
 
 打开一个新的终端窗口（**非**管理员），依次执行以下指令：
 
@@ -173,49 +215,33 @@ arm-none-eabi-g++ --version
 
 验证完成后，可以关闭终端窗口。
 
-## 4. 安装开发软件
+## 5. 安装开发软件
 
-### 4.1 安装 VS Code
+### 5.1 安装 VS Code
 
-若已安装 VS Code，可跳过本节。
-
-- 从 [Visual Studio Code](https://code.visualstudio.com/) 下载最新的 VS Code 安装包。
-- 运行下载的 `VSCodeUserSetup-xxx-x.xxx.x.exe`。
+- 运行第 1 节下载的 VS Code 安装包。
 - 点击 `Next`，**直到见到此页**。请确保以下 **4 个选项全部勾选**。
 
   ![](RM%20Embedded%20Tutorial%20环境配置%20Windows.assets/Pasted%20image%2020260831210220.png)
 
 - 点击 `Next` 并同意必要的协议，直到安装结束。
 
-### 4.2 下载嵌入式开发软件安装包
+### 5.2 安装 STM32CubeMX
 
-- 下载全部 4 个 EXE 文件：[Windows Installer - Google Drive](https://drive.google.com/drive/folders/1EOInHq8uI7IkX7qAfVduWJLmwroviRnI?usp=sharing)
+- 运行第 1 节下载的 STM32CubeMX 安装程序，按照提示完成安装。
 
-> **官方下载页面**
->
-> - [STM32CubeMX - STMicroelectronics](https://www.st.com/en/development-tools/stm32cubemx.html)
-> - [J-Link / J-Trace - SEGGER](https://www.segger.com/downloads/jlink)
+### 5.3 安装 J-Link Driver
 
-### 4.3 安装 STM32CubeMX
+- 运行第 1 节下载的 J-Link V7.92c 安装程序，按照提示完成安装。
 
-- 运行 `SetupSTM32CubeMX-6.18.1.exe`。
-- 点击 `Next` 并同意必要的协议，直到安装结束。
+### 5.4 安装 Ozone
 
-### 4.4 安装 J-Link Driver
+- 运行第 1 节下载的 Ozone V3.30b 安装程序，按照提示完成安装。
 
-- 运行 `JLink_Windows_V792c_x86_64.exe`。
-- 点击 `Next` 并同意必要的协议，直到安装结束。
+### 5.5 安装 SystemView
 
-### 4.5 安装 Ozone
+- 运行第 1 节下载的 SystemView 安装程序，按照提示完成安装。
 
-- 运行 `Ozone_Windows_V330b_x64.exe`。
-- 点击 `Next` 并同意必要的协议，直到安装结束。
+## 6. 下一步
 
-### 4.6 安装 SystemView
-
-- 运行 `SystemView_Windows_V410b_x64.exe`。
-- 点击 `Next` 并同意必要的协议，直到安装结束。
-
-## 5. 下一步
-
-环境配置完成。接下来请继续进行 [环境验证](<../Verify/RM Embedded Tutorial 环境验证.md>)。
+环境配置完成。接下来请继续进行 [环境验证](<../Verify/index.md>)。

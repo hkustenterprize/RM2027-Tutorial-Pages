@@ -4,9 +4,9 @@
 
 ### KiCad
 
-下载并安装 **KiCad 9.0.3**。请选择与当前操作系统和架构对应的安装包。
+下载并安装 **KiCad 10.0.6**。请选择与当前操作系统和架构对应的安装包。
 
-**下载版本9.0.3！不要下载最新版。**
+**下载版本10.0.6！不要下载其余的10.0版本。**
 
 - [Windows 下载页面](https://downloads.kicad.org/kicad/windows/explore/stable)
 - [macOS 下载页面](https://downloads.kicad.org/kicad/macos/explore/stable)

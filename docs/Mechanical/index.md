@@ -8,7 +8,7 @@
 
 > **SolidWorks 安装文件请从“准备安装文件”链接获取，不要使用安装教程正文中的下载地址。**
 
-> **解压文件时如需输入密码，请使用密码：'www.cadzxw.com' 。**
+> **解压文件时如需输入密码，请使用密码： `www.cadzxw.com` 。**
 
 - [准备安装文件](https://drive.google.com/drive/folders/14w2ayixiLvAvQqbLb10XoDmNUbJs5lX2)
 - [SolidWorks 安装教程](https://app.notion.com/p/SolidWorks-2665d69daa5c80c8a80bfbbb9e7d69fe)

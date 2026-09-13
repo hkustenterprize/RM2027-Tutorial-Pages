@@ -222,7 +222,7 @@ arm-none-eabi-g++ --version
 
 ## 7. 使用提示
 
-### 7.1 从工程目录打开 Visual Studio Code
+### 7.1 从文件夹打开 Visual Studio Code
 
 首次使用 `code` 命令前，需要先将它添加到 `PATH`：
 

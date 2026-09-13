@@ -45,7 +45,13 @@ Intel 芯片请选择 x86_64 版本；Apple Silicon 芯片请选择 ARM64 版本
 
 ### 1.5 SEGGER SystemView
 
-从 [SystemView 官方下载页面](https://www.segger.com/downloads/jlink#SystemView) 下载适用于 macOS 和当前芯片架构的版本。
+从 [SystemView 官方下载页面](https://www.segger.com/downloads/jlink#SystemView) 下载适用于 macOS 和当前芯片架构的 **V3.60** 版本。
+
+### 1.6 Serial Port 串口调试助手
+
+从 App Store 中搜索serial port并下载安装
+
+![在 App Store 中搜索 Serial Port](RM%20Embedded%20Tutorial%20环境配置%20macOS.assets/serial_port_installation.png)
 
 ## 2. 安装 Visual Studio Code
 
@@ -216,9 +222,46 @@ arm-none-eabi-g++ --version
 
 ## 7. 使用提示
 
-- 在 macOS 上建议使用 STM32CubeMX 的 `Load Project` 功能打开 `.ioc` 工程。部分情况下，双击 `.ioc` 文件无法正确加载工程。
-- 某些 Mac 需要在系统设置中为 STM32CubeMX 开启“完全磁盘访问权限”，否则可能无法找到 `.ioc` 工程文件。
-- 需要从工程目录打开 Visual Studio Code 时，可以在 Finder 中右键文件夹，选择 `服务` → `新建位于文件夹位置的终端窗口`，再执行 `code .`。
+### 7.1 从工程目录打开 Visual Studio Code
+
+首次使用 `code` 命令前，需要先将它添加到 `PATH`：
+
+1. 打开 Visual Studio Code，按 `Command + Shift + P` 打开命令面板。
+2. 输入 `shell command`，然后选择 `Shell Command: Install 'code' command in PATH`。
+
+![在 PATH 中安装 code 命令](RM%20Embedded%20Tutorial%20环境配置%20macOS.assets/install_code_cmd_to_path.png)
+
+安装完成后，关闭并重新打开终端，然后按照以下步骤从工程目录启动 Visual Studio Code：
+
+1. 打开访达（Finder），在屏幕顶部的菜单栏中选择 `显示`，然后点击 `显示路径栏`。
+
+    ![在 Finder 中显示路径栏](RM%20Embedded%20Tutorial%20环境配置%20macOS.assets/open_folder_in_terminal_1.png)
+
+2. 在访达中找到工程文件夹。窗口底部的路径栏会显示当前文件夹的完整路径。
+
+    ![Finder 窗口底部的路径栏](RM%20Embedded%20Tutorial%20环境配置%20macOS.assets/open_folder_in_terminal_2.png)
+
+3. 在路径栏中右键点击要打开的工程文件夹，选择 `在终端中打开`，然后在打开的终端中执行：
+
+    ```bash
+    code .
+    ```
+
+    ![从 Finder 路径栏在终端中打开文件夹](RM%20Embedded%20Tutorial%20环境配置%20macOS.assets/open_folder_in_terminal_3.png)
+
+### 7.2 打开 STM32CubeMX 工程
+
+在 macOS 上，双击 `.ioc` 文件可能无法正确加载工程。建议打开 STM32CubeMX，然后使用 `Load Project` 功能选择并打开 `.ioc` 工程文件。
+
+如果 STM32CubeMX 无法找到 `.ioc` 工程文件，请按照以下步骤为 STM32CubeMX 开启“完全磁盘访问权限”：
+
+1. 打开 `系统设置`，选择 `隐私与安全性`，然后点击 `完全磁盘访问权限`。
+
+    ![打开完全磁盘访问权限设置](RM%20Embedded%20Tutorial%20环境配置%20macOS.assets/open_authorization_for_cubemx1.png)
+
+2. 在应用列表中找到 STM32CubeMX，并打开右侧的开关。如果列表中没有 STM32CubeMX，请点击左下角的 `+` 将其添加。
+
+    ![为 STM32CubeMX 开启完全磁盘访问权限](RM%20Embedded%20Tutorial%20环境配置%20macOS.assets/open_authorization_for_cubemx2.png)
 
 ## 8. 下一步
 

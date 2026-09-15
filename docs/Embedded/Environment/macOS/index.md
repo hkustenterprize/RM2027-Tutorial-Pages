@@ -271,6 +271,14 @@ arm-none-eabi-g++ --version
 
     ![为 STM32CubeMX 开启完全磁盘访问权限](RM%20Embedded%20Tutorial%20环境配置%20macOS.assets/open_authorization_for_cubemx2.png)
 
+### 7.3 开启 Visual Studio Code 自动保存
+
+建议开启自动保存，避免修改代码后忘记保存，导致编译时仍使用旧代码。
+
+在 Visual Studio Code 顶部菜单栏中选择 `文件` → `自动保存`。菜单项前出现勾选标记即表示已开启，如下图所示。
+
+![在 Visual Studio Code 中开启自动保存](RM%20Embedded%20Tutorial%20环境配置%20macOS.assets/auto_save.png)
+
 ## 8. 下一步
 
 环境配置完成。接下来请继续进行 [环境验证](<../Verify/index.md>)。

@@ -82,6 +82,14 @@ Intel 芯片请选择 x86_64 版本；Apple Silicon 芯片请选择 ARM64 版本
 
 ![Homebrew 安装完成](RM%20Embedded%20Tutorial%20环境配置%20macOS.assets/page-06-image-01.png)
 
+**安装完成后，关闭当前终端窗口，并重新打开终端**，执行以下命令验证：
+
+```bash
+brew --version
+```
+
+确认能够显示 Homebrew 版本信息后，再继续后续安装。
+
 ## 4. 配置 Git 与 GitHub
 
 ### 4.1 安装 Git

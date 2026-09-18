@@ -47,6 +47,8 @@ nav:
           - macOS: "Embedded/Environment/macOS/index.md"
           - Linux: "Embedded/Environment/Linux/index.md"
           - 环境验证: "Embedded/Environment/Verify/index.md"
+      - 作业:
+          - "作业 1：遥控器与接收机驱动": Embedded/Assignment/Assignment1/index.md
 
 markdown_extensions:
   - attr_list

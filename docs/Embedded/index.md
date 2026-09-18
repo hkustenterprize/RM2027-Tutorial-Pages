@@ -16,7 +16,7 @@
 
 ## 课程
 
-- [第一课：Introduction to Embedded System（PPT）](Course/Introduction-to-Embedded-System.pptx)
+- [第一课：Introduction to Embedded System（PDF）](Course/Introduction-to-Embedded-System.pdf)
 
 ## 作业
 

@@ -16,7 +16,7 @@
 
 ## 课程
 
-嵌入式部门课程将在此处更新。
+- [第一课：Introduction to Embedded System（PPT）](Course/Introduction-to-Embedded-System.pptx)
 
 ## 作业
 

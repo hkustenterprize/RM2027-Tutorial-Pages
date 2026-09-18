@@ -2,3 +2,6 @@
 site/
 __pycache__/
 .DS_Store
+
+# Office temporary files
+~$*

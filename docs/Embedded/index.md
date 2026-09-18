@@ -16,6 +16,7 @@
 
 ## 课程
 
+- [第 0 课：C++ Tutorial](https://drive.google.com/drive/folders/1hbmdChpYoPN75QKTG9d-vQLtOlBAbcfT?usp=drive_link)
 - [第一课：Introduction to Embedded System（PDF）](Course/Introduction-to-Embedded-System.pdf)
 
 ## 作业

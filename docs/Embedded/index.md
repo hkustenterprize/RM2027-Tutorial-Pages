@@ -17,7 +17,10 @@
 ## 课程
 
 - [Tutorial 0：C++ Tutorial](https://drive.google.com/drive/folders/1hbmdChpYoPN75QKTG9d-vQLtOlBAbcfT?usp=drive_link)
-- [Tutorial 1：Introduction to Embedded System（PDF）](Course/Introduction-to-Embedded-System.pdf)
+- [Tutorial 1：Introduction to Embedded System](https://drive.google.com/drive/folders/12UpMeoHU_ZNJ9v3CEk3bbNuVo3BYgGuR?usp=drive_link)
+- [Tutorial 4：CAN](https://drive.google.com/drive/folders/1a9dzMYux6DID3ckUof13KxmAMgs7sUzC?usp=sharing)
+- [Tutorial 5：PID](https://drive.google.com/drive/folders/1IYNPPKZhDktt1x0LAvl82ve-gzqShWJt?usp=drive_link)
+- [Tutorial 6：PWM](https://drive.google.com/drive/folders/10qTFk3EfvK6kUb6KxoNQUj0eGSXcNe_9?usp=drive_link)
 
 ## 作业
 

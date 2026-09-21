@@ -7,6 +7,7 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
+  custom_dir: docs/overrides
   language: zh
   logo: assets/enterprize-logo.png
   favicon: assets/favicon.png
@@ -33,6 +34,10 @@ plugins:
       lang:
         - zh
         - en
+  - git-revision-date-localized:
+      locale: zh
+      type: datetime
+      timezone: Asia/Hong_Kong
 
 nav:
   - 首页: index.md
@@ -47,8 +52,9 @@ nav:
           - macOS: "Embedded/Environment/macOS/index.md"
           - Linux: "Embedded/Environment/Linux/index.md"
           - 环境验证: "Embedded/Environment/Verify/index.md"
+      - 课程: /Embedded/#courses
       - 作业:
-          - "作业 1：遥控器与接收机驱动": Embedded/Assignment/Assignment1/index.md
+          - "作业 1": Embedded/Assignments/Assignment1/index.md
 
 markdown_extensions:
   - attr_list

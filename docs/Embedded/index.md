@@ -14,16 +14,21 @@
 
 [嵌入式环境验证](<Environment/Verify/index.md>)
 
-## 课程
+## 课程 { #courses }
 
-- [Tutorial 0：C++ Tutorial](https://drive.google.com/drive/folders/1hbmdChpYoPN75QKTG9d-vQLtOlBAbcfT?usp=drive_link)
-- [Tutorial 1：Introduction to Embedded System](https://drive.google.com/drive/folders/12UpMeoHU_ZNJ9v3CEk3bbNuVo3BYgGuR?usp=drive_link)
-- [Tutorial 4：CAN](https://drive.google.com/drive/folders/1a9dzMYux6DID3ckUof13KxmAMgs7sUzC?usp=sharing)
-- [Tutorial 5：PID](https://drive.google.com/drive/folders/1IYNPPKZhDktt1x0LAvl82ve-gzqShWJt?usp=drive_link)
-- [Tutorial 6：PWM](https://drive.google.com/drive/folders/10qTFk3EfvK6kUb6KxoNQUj0eGSXcNe_9?usp=drive_link)
+| 课程 | 材料 |
+| --- | --- |
+| Tutorial 0：C++ Tutorial | [Google Drive](https://drive.google.com/drive/folders/1hbmdChpYoPN75QKTG9d-vQLtOlBAbcfT?usp=drive_link) |
+| Tutorial 1：Introduction to Embedded System | [Google Drive](https://drive.google.com/drive/folders/12UpMeoHU_ZNJ9v3CEk3bbNuVo3BYgGuR?usp=drive_link) |
+| Tutorial 2：Communication Protocols & UART | [查看讲义](<CourseMaterials/T2/Embedded Tutorial 2 - 通信协议 UART.md>) |
+| Tutorial 3：Interrupt & DMA (UART Receive) | [查看讲义](<CourseMaterials/T3/Embedded Tutorial 3 - UART接收 中断与DMA.md>) |
+| Tutorial 4：CAN Communication | [查看课件](<CourseMaterials/T4/Embedded Tutorial 4 - CAN Communication.pdf>) |
+| Tutorial 5：Control & PID | [Google Drive](https://drive.google.com/drive/folders/1IYNPPKZhDktt1x0LAvl82ve-gzqShWJt?usp=drive_link) |
+| Tutorial 6：Clock & Timer & PWM | [Google Drive](https://drive.google.com/drive/folders/10qTFk3EfvK6kUb6KxoNQUj0eGSXcNe_9?usp=drive_link) |
 
 ## 作业
 
 | 作业 | 内容 | 截止时间 |
 | --- | --- | --- |
-| [作业 1：遥控器与接收机驱动](Assignment/Assignment1/index.md) | 接线与配对、SBUS 解码、链路状态检测及串口回传 | 2026 年 10 月 1 日 22:00 |
+| [作业 1：单片机通讯](Assignments/Assignment1/index.md) | 接收遥控器消息：接线与配对、SBUS 解码、链路状态检测及串口回传 | 2026 年 10 月 1 日 22:00 |
+| 作业 2：电机控制 |  |  |

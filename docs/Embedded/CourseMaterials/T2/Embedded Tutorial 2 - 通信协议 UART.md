@@ -1,5 +1,7 @@
 # Embedded Tutorial 2 - 通信协议 UART
 
+> **补充资料**：[进制、整数类型与位运算](supplementary-reading.md)。建议课前阅读，帮助理解 UART 字节数据和后续协议解析。
+
 ## 课前需要准备
 
 - STM32 开发板

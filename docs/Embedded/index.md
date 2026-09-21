@@ -20,7 +20,7 @@
 | --- | --- |
 | Tutorial 0：C++ Tutorial | [Google Drive](https://drive.google.com/drive/folders/1hbmdChpYoPN75QKTG9d-vQLtOlBAbcfT?usp=drive_link) |
 | Tutorial 1：Introduction to Embedded System | [Google Drive](https://drive.google.com/drive/folders/12UpMeoHU_ZNJ9v3CEk3bbNuVo3BYgGuR?usp=drive_link) |
-| Tutorial 2：Communication Protocols & UART | [查看讲义](<CourseMaterials/T2/Embedded Tutorial 2 - 通信协议 UART.md>) |
+| Tutorial 2：Communication Protocols & UART | [查看讲义](<CourseMaterials/T2/Embedded Tutorial 2 - 通信协议 UART.md>)<br>[补充资料](CourseMaterials/T2/supplementary-reading.md) |
 | Tutorial 3：Interrupt & DMA (UART Receive) | [查看讲义](<CourseMaterials/T3/Embedded Tutorial 3 - UART接收 中断与DMA.md>) |
 | Tutorial 4：CAN Communication | [查看课件](<CourseMaterials/T4/Embedded Tutorial 4 - CAN Communication.pdf>) |
 | Tutorial 5：Control & PID | [Google Drive](https://drive.google.com/drive/folders/1IYNPPKZhDktt1x0LAvl82ve-gzqShWJt?usp=drive_link) |

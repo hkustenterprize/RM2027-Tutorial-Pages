@@ -14,6 +14,12 @@
 
 [嵌入式环境验证](<Environment/Verify/index.md>)
 
+## 基础教程
+
+这里整理了嵌入式开发中常用工具的入门资料，包括 STM32CubeMX 基础教程和 Ozone 使用教程：
+
+[查看嵌入式基础教程（Google Drive）](https://drive.google.com/drive/folders/1ChaGXjBYJlJSYJRxwt5jeC3wrcTmKsQ-?usp=drive_link)
+
 ## 课程 { #courses }
 
 | 课程 | 材料 |

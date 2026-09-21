@@ -1,8 +1,4 @@
-# Tutorial 2 UART 补充资料：进制、整数类型与位运算
-
-本文是 Tutorial 2 的补充阅读，建议在学习 UART 数据收发和协议解析前阅读。
-
-[返回 Tutorial 2：通信协议 UART](<Embedded Tutorial 2 - 通信协议 UART.md>)
+# 关于 UART 你需要提前了解的东西
 
 UART 按照一个个字节发送和接收数据，而协议中的一个数值可能占用一个字节，也可能分布在多个字节中。因此，在学习 UART 数据收发和协议解析之前，需要先理解进制、整数类型和位运算。
 
@@ -215,6 +211,6 @@ int z = c >> 2;    // 0b01000000 → 0b00010000，补 0，结果为 16
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `a` | 0 | <span style="color: #d32f2f;">1</span> | 0 | 0 | <span style="color: #d32f2f;">1</span> | <span style="color: #d32f2f;">1</span> | 0 | <span style="color: #d32f2f;">1</span> |
 | `b` | 0 | <span style="color: #d32f2f;">1</span> | <span style="color: #d32f2f;">1</span> | 0 | 0 | <span style="color: #d32f2f;">1</span> | <span style="color: #d32f2f;">1</span> | 0 |
-| `c = a \| b` | 0 | <span style="color: #d32f2f;">1</span> | <span style="color: #d32f2f;">1</span> | 0 | <span style="color: #d32f2f;">1</span> | <span style="color: #d32f2f;">1</span> | <span style="color: #d32f2f;">1</span> | <span style="color: #d32f2f;">1</span> |
+| <code>c = a &#124; b</code> | 0 | <span style="color: #d32f2f;">1</span> | <span style="color: #d32f2f;">1</span> | 0 | <span style="color: #d32f2f;">1</span> | <span style="color: #d32f2f;">1</span> | <span style="color: #d32f2f;">1</span> | <span style="color: #d32f2f;">1</span> |
 
 红色标出了 `a` 或 `b` 中为 1 的位，以及这些位经过位或运算后得到的结果。

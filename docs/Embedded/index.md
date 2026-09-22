@@ -14,13 +14,19 @@
 
 [嵌入式环境验证](<Environment/Verify/index.md>)
 
+## 基础教程
+
+这里整理了嵌入式开发中常用工具的入门资料，包括 STM32CubeMX 基础教程和 Ozone 使用教程：
+
+[查看嵌入式基础教程（Google Drive）](https://drive.google.com/drive/folders/1ChaGXjBYJlJSYJRxwt5jeC3wrcTmKsQ-?usp=drive_link)
+
 ## 课程 { #courses }
 
 | 课程 | 材料 |
 | --- | --- |
 | Tutorial 0：C++ Tutorial | [Google Drive](https://drive.google.com/drive/folders/1hbmdChpYoPN75QKTG9d-vQLtOlBAbcfT?usp=drive_link) |
 | Tutorial 1：Introduction to Embedded System | [Google Drive](https://drive.google.com/drive/folders/12UpMeoHU_ZNJ9v3CEk3bbNuVo3BYgGuR?usp=drive_link) |
-| Tutorial 2：Communication Protocols & UART | [查看讲义](<CourseMaterials/T2/Embedded Tutorial 2 - 通信协议 UART.md>) |
+| Tutorial 2：Communication Protocols & UART | [查看讲义](<CourseMaterials/T2/Embedded Tutorial 2 - 通信协议 UART.md>)<br>[补充资料](CourseMaterials/T2/supplementary-reading.md) |
 | Tutorial 3：Interrupt & DMA (UART Receive) | [查看讲义](<CourseMaterials/T3/Embedded Tutorial 3 - UART接收 中断与DMA.md>) |
 | Tutorial 4：CAN Communication | [查看课件](<CourseMaterials/T4/Embedded Tutorial 4 - CAN Communication.pdf>) |
 | Tutorial 5：Control & PID | [Google Drive](https://drive.google.com/drive/folders/1IYNPPKZhDktt1x0LAvl82ve-gzqShWJt?usp=drive_link) |

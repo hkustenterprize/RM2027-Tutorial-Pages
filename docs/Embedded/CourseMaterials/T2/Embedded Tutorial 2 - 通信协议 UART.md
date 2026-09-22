@@ -106,7 +106,7 @@ UART 虽然没有时钟线，但双方仍必须共享相近的时间节奏。
 
 有了**时序规则**，我们就有了稳定收发一个01序列的基础。
 
-![[Pasted image 20260804203409.png|378]]
+![UART 帧结构示意图](Pasted%20image%2020260804203409.png)
 
 |                 | 长度     | 长度可调？       | 内容                       |
 | --------------- | ------ | ----------- | ------------------------ |
@@ -196,7 +196,7 @@ CPU -----------------> UART Peripheral -------> Signals on the wire
 ---
 ## 实践：在 STM32CubeMX软件 中配置 UART外设
 
-![[Pasted image 20260804215302.png|392]]
+![STM32CubeMX UART 配置界面](../T3/Pasted%20image%2020260804215302.png)
 
 **确认引脚** : 看开发板上的丝印！
 
@@ -205,13 +205,7 @@ CPU -----------------> UART Peripheral -------> Signals on the wire
 ---
 ## 实践：让 STM32 通过UART给电脑发送数据 字符串Hello World!
 
-接线：
-```text
-STM32 TX  ----------  USB-TTL RX
-STM32 RX  ----------  USB-TTL TX
-STM32 GND ----------  USB-TTL GND
-```
-> **TX 接 RX，RX 接 TX，GND 接 GND**
+> **连接提示：** 开发板上已经集成了 CH340 USB-TTL 芯片，无需额外连接 USB-TTL 模块。只需使用 Type-C 数据线连接开发板与电脑，电脑即可识别到对应的串口。
 
 STM32侧：
 1. CubeMX 完成 UART 配置并Generate Code

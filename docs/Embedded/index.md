@@ -40,34 +40,57 @@
 <style>
 .tutorial3-demo {
   width: 100%;
-  height: auto;
-  aspect-ratio: 16 / 9;
-  min-height: 0;
+  height: 100%;
   border: 0;
   border-radius: 12px;
   background: #02040a;
+}
+.tutorial3-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #02040a;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.tutorial3-frame:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+}
+.tutorial3-fullscreen {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  padding: 6px 10px;
+  border: 1px solid rgba(125, 211, 252, .45);
+  border-radius: 8px;
+  background: rgba(2, 4, 10, .72);
+  color: #dbeafe;
+  cursor: pointer;
 }
 </style>
 
 <h4>UART 接收过程</h4>
 
-<iframe class="tutorial3-demo" src="CourseMaterials/T3/interactive-demo/uart_receive.html" title="STM32 UART 接收过程" loading="lazy"></iframe>
+<div class="tutorial3-frame"><button class="tutorial3-fullscreen" type="button" onclick="this.parentElement.requestFullscreen()">⛶ 全屏</button><iframe class="tutorial3-demo" src="CourseMaterials/T3/interactive-demo/uart_receive.html" title="STM32 UART 接收过程" loading="lazy" allowfullscreen></iframe></div>
 
 <h4>UART + DMA 接收</h4>
 
-<iframe class="tutorial3-demo" src="CourseMaterials/T3/interactive-demo/uart_receive_DMA.html" title="STM32 UART + DMA 接收" loading="lazy"></iframe>
+<div class="tutorial3-frame"><button class="tutorial3-fullscreen" type="button" onclick="this.parentElement.requestFullscreen()">⛶ 全屏</button><iframe class="tutorial3-demo" src="CourseMaterials/T3/interactive-demo/uart_receive_DMA.html" title="STM32 UART + DMA 接收" loading="lazy" allowfullscreen></iframe></div>
 
 <h4>UART 中断接收</h4>
 
-<iframe class="tutorial3-demo" src="CourseMaterials/T3/interactive-demo/uart_receive_it.html" title="STM32 UART 中断接收" loading="lazy"></iframe>
+<div class="tutorial3-frame"><button class="tutorial3-fullscreen" type="button" onclick="this.parentElement.requestFullscreen()">⛶ 全屏</button><iframe class="tutorial3-demo" src="CourseMaterials/T3/interactive-demo/uart_receive_it.html" title="STM32 UART 中断接收" loading="lazy" allowfullscreen></iframe></div>
 
 <h4>UART 接收超时</h4>
 
-<iframe class="tutorial3-demo" src="CourseMaterials/T3/interactive-demo/uart_receive_timeout.html" title="STM32 UART 接收超时" loading="lazy"></iframe>
+<div class="tutorial3-frame"><button class="tutorial3-fullscreen" type="button" onclick="this.parentElement.requestFullscreen()">⛶ 全屏</button><iframe class="tutorial3-demo" src="CourseMaterials/T3/interactive-demo/uart_receive_timeout.html" title="STM32 UART 接收超时" loading="lazy" allowfullscreen></iframe></div>
 
 <h4>UART 按位解码</h4>
 
-<iframe class="tutorial3-demo" src="CourseMaterials/T3/interactive-demo/uart_decode_by_bit.html" title="UART 按位解码" loading="lazy"></iframe>
+<div class="tutorial3-frame"><button class="tutorial3-fullscreen" type="button" onclick="this.parentElement.requestFullscreen()">⛶ 全屏</button><iframe class="tutorial3-demo" src="CourseMaterials/T3/interactive-demo/uart_decode_by_bit.html" title="UART 按位解码" loading="lazy" allowfullscreen></iframe></div>
 
 </details>
 

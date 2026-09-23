@@ -32,7 +32,7 @@
 | Tutorial 5：Control & PID | [Google Drive](https://drive.google.com/drive/folders/1IYNPPKZhDktt1x0LAvl82ve-gzqShWJt?usp=drive_link) |
 | Tutorial 6：Clock & Timer & PWM | [Google Drive](https://drive.google.com/drive/folders/10qTFk3EfvK6kUb6KxoNQUj0eGSXcNe_9?usp=drive_link) |
 
-<details id="tutorial3-demo">
+<details id="tutorial3-demo" open>
 <summary>交互式 Demo</summary>
 
 下面的动画可以直接在网站中播放，帮助理解 UART 接收、中断和 DMA 的工作过程。
@@ -40,30 +40,32 @@
 <style>
 .tutorial3-demo {
   width: 100%;
-  height: 760px;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  min-height: 0;
   border: 0;
   border-radius: 12px;
   background: #02040a;
 }
 </style>
 
-#### UART 接收过程
+<h4>UART 接收过程</h4>
 
 <iframe class="tutorial3-demo" src="CourseMaterials/T3/interactive-demo/uart_receive.html" title="STM32 UART 接收过程" loading="lazy"></iframe>
 
-#### UART + DMA 接收
+<h4>UART + DMA 接收</h4>
 
 <iframe class="tutorial3-demo" src="CourseMaterials/T3/interactive-demo/uart_receive_DMA.html" title="STM32 UART + DMA 接收" loading="lazy"></iframe>
 
-#### UART 中断接收
+<h4>UART 中断接收</h4>
 
 <iframe class="tutorial3-demo" src="CourseMaterials/T3/interactive-demo/uart_receive_it.html" title="STM32 UART 中断接收" loading="lazy"></iframe>
 
-#### UART 接收超时
+<h4>UART 接收超时</h4>
 
 <iframe class="tutorial3-demo" src="CourseMaterials/T3/interactive-demo/uart_receive_timeout.html" title="STM32 UART 接收超时" loading="lazy"></iframe>
 
-#### UART 按位解码
+<h4>UART 按位解码</h4>
 
 <iframe class="tutorial3-demo" src="CourseMaterials/T3/interactive-demo/uart_decode_by_bit.html" title="UART 按位解码" loading="lazy"></iframe>
 

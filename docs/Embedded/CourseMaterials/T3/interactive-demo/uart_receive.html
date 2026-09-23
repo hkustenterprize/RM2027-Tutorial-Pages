@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>STM32 UART 接收过程</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{
+    height:100%;background:#02040a;overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  #viewport{
+    position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    overflow:hidden;
+  }
+  #stage{
+    position:relative;width:1200px;height:720px;flex:none;
+    background:radial-gradient(circle at 18% 8%,#0c1728 0%,#060b16 58%,#02040a 100%);
+    border:1px solid rgba(120,180,255,.08);
+    border-radius:24px;overflow:hidden;
+    transform-origin:center center;
+    box-shadow:0 40px 100px rgba(0,0,0,.8);
+  }
+
+  #title{
+    position:absolute;top:14px;left:0;right:0;text-align:center;
+    font-size:17px;font-weight:700;letter-spacing:3px;
+    color:#c9e0ff;text-shadow:0 0 26px rgba(56,189,248,.3);z-index:5;
+  }
+  #subtitle{
+    position:absolute;top:38px;left:0;right:0;text-align:center;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:10.5px;color:#33506f;letter-spacing:.3px;z-index:5;
+  }
+  #subtitle b{color:#38bdf8;font-weight:600}
+
+  /* 面板 */
+  .panel{
+    position:absolute;
+    background:rgba(255,255,255,.024);
+    border:1px solid rgba(120,170,240,.14);
+    border-radius:18px;
+    opacity:0;
+    transform-origin:center center;
+    transition:opacity .55s ease,
+               transform .85s cubic-bezier(.4,0,.2,1),
+               box-shadow .4s ease, border-color .4s ease;
+    box-shadow:0 14px 40px rgba(0,0,0,.45);
+    will-change:transform,opacity;
+  }
+  .panel.on{ opacity:1 }
+  .panel.on.dim{ opacity:0.10 }
+  .panel-head{
+    position:absolute;left:16px;top:11px;
+    font-size:11px;font-weight:600;letter-spacing:1.2px;
+    color:#6d93bd;white-space:nowrap;
+  }
+
+  /* 转换面板边缘高亮 */
+  .panel.converting{
+    border-color: rgba(56,189,248,.7);
+    animation: convGlow 1.6s ease-in-out infinite;
+  }
+  @keyframes convGlow{
+    0%,100%{
+      box-shadow: 0 0 0 2px rgba(56,189,248,.35),
+                  0 0 34px rgba(56,189,248,.22),
+                  0 14px 40px rgba(0,0,0,.45),
+                  inset 0 0 40px rgba(56,189,248,.05);
+    }
+    50%{
+      box-shadow: 0 0 0 3px rgba(56,189,248,.6),
+                  0 0 55px rgba(56,189,248,.45),
+                  0 14px 40px rgba(0,0,0,.45),
+                  inset 0 0 55px rgba(56,189,248,.12);
+    }
+  }
+
+  /* PC */
+  #pcPanel .pc-msg{
+    position:absolute;left:18px;top:38px;right:18px;
+    font-size:13px;color:#a7c9ec;letter-spacing:.5px;
+    font-family:ui-monospace,"PingFang SC",monospace;
+  }
+  #pcPanel .pc-msg .hl{ color:#fbbf24;font-weight:700 }
+  #pcPanel .pc-chars{
+    position:absolute;left:0;right:0;top:90px;
+    display:flex;justify-content:center;gap:14px;
+  }
+  .pc-char{
+    width:56px;height:66px;
+    display:flex;align-items:center;justify-content:center;
+    border-radius:12px;
+    border:2px solid rgba(120,170,240,.2);
+    background:rgba(255,255,255,.02);
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:30px;font-weight:800;color:#54759c;
+    transition:all .3s ease;
+  }
+  .pc-char.flash{
+    border-color:#38bdf8;background:rgba(56,189,248,.22);color:#dbeafe;
+    box-shadow:0 0 30px rgba(56,189,248,.7),0 0 60px rgba(56,189,248,.3);
+    transform:translateY(-6px) scale(1.08);
+  }
+  .pc-char.converting{
+    border-color:#38bdf8;
+    background:rgba(56,189,248,.16);
+    color:#dbeafe;
+    box-shadow:0 0 24px rgba(56,189,248,.65),0 0 46px rgba(56,189,248,.28);
+    transform:translateY(-4px) scale(1.06);
+    animation: pcCharPulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pcCharPulse{
+    0%,100%{ box-shadow:0 0 20px rgba(56,189,248,.5),0 0 40px rgba(56,189,248,.2) }
+    50%    { box-shadow:0 0 32px rgba(56,189,248,.85),0 0 60px rgba(56,189,248,.4) }
+  }
+  .pc-char.done{
+    border-color:rgba(52,211,153,.55);
+    background:rgba(52,211,153,.09);
+    color:#6ee7b7;
+  }
+
+  /* 转换面板 */
+  #convPanel .conv-char-line{
+    position:absolute;left:20px;right:20px;top:40px;
+    display:flex;align-items:center;gap:14px;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    opacity:0;transition:opacity .4s;
+  }
+  #convPanel .conv-char-line.show{opacity:1}
+  #convPanel .conv-char-big{
+    font-size:34px;font-weight:800;color:#fbbf24;
+    text-shadow:0 0 24px rgba(251,191,36,.5);
+  }
+  #convPanel .conv-eq{ color:#4d6b8f;font-size:18px }
+  #convPanel .conv-hex-big{
+    font-size:18px;font-weight:700;color:#7dd3fc;
+    padding:4px 10px;border-radius:8px;
+    background:rgba(56,189,248,.1);
+    border:1px solid rgba(56,189,248,.3);
+  }
+  #convPanel .conv-label{
+    position:absolute;left:20px;
+    font-size:10.5px;color:#5d7ea6;
+    font-family:ui-monospace,monospace;
+    letter-spacing:.6px;
+    opacity:0;transition:opacity .4s;
+  }
+  #convPanel .conv-label.show{opacity:1}
+
+  .bin-cell{
+    position:absolute;
+    display:flex;align-items:center;justify-content:center;
+    width:32px;height:32px;border-radius:8px;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:15px;font-weight:800;
+    color:transparent;
+    border:1.5px dashed rgba(120,170,240,.2);
+    background:rgba(255,255,255,.02);
+    transform:scale(0);
+    transition:transform .25s cubic-bezier(.34,1.56,.64,1),
+               background .3s, border-color .3s, color .3s, box-shadow .3s;
+  }
+  .bin-cell.one{
+    border-style:solid;border-color:#34d399;
+    background:rgba(52,211,153,.2);color:#5eead4;
+    box-shadow:0 0 12px rgba(52,211,153,.4);
+  }
+  .bin-cell.zero{
+    border-style:solid;border-color:#64748b;
+    background:rgba(100,116,139,.22);color:#cbd5e1;
+  }
+  .bin-cell.flash{
+    box-shadow:0 0 22px rgba(56,189,248,.9)!important;
+    border-color:#38bdf8!important;
+    transform:scale(1.15)!important;
+  }
+
+  .uart-slot{
+    position:absolute;
+    display:flex;align-items:center;justify-content:center;
+    width:26px;height:30px;border-radius:6px;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:13px;font-weight:800;
+    color:transparent;
+    border:1.5px dashed rgba(120,170,240,.2);
+    background:rgba(255,255,255,.02);
+    transform:scale(0);
+    transition:transform .25s cubic-bezier(.34,1.56,.64,1),
+               background .3s, border-color .3s, color .3s, box-shadow .3s;
+  }
+  .uart-slot.start{
+    border-style:solid;border-color:#fbbf24;
+    background:rgba(251,191,36,.2);color:#fcd34d;
+    box-shadow:0 0 12px rgba(251,191,36,.5);
+  }
+  .uart-slot.stop{
+    border-style:solid;border-color:#f43f5e;
+    background:rgba(244,63,94,.2);color:#fecdd3;
+    box-shadow:0 0 12px rgba(244,63,94,.5);
+  }
+  .uart-slot.one{
+    border-style:solid;border-color:#34d399;
+    background:rgba(52,211,153,.2);color:#5eead4;
+    box-shadow:0 0 10px rgba(52,211,153,.4);
+  }
+  .uart-slot.zero{
+    border-style:solid;border-color:#64748b;
+    background:rgba(100,116,139,.25);color:#cbd5e1;
+  }
+  .uart-tag{
+    position:absolute;
+    font-family:ui-monospace,monospace;
+    font-size:8px;color:#4d6b8f;
+    text-align:center;letter-spacing:.3px;
+  }
+
+  /* 代码面板 */
+  .code-line{
+    position:absolute;
+    display:flex;align-items:center;
+    padding:0 10px;height:22px;
+    border-radius:8px;
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    font-size:11px;line-height:1;white-space:pre;
+    color:#7f9cbe;
+    transition:background .3s,box-shadow .3s,color .3s;
+  }
+  .code-line.active{
+    background:rgba(56,189,248,.16);
+    box-shadow:inset 0 0 0 1px rgba(56,189,248,.4),0 0 26px rgba(56,189,248,.12);
+    color:#e0f2fe;
+  }
+  .code-line.waiting{
+    background:rgba(56,189,248,.10);
+    box-shadow:inset 0 0 0 1px rgba(56,189,248,.28),0 0 26px rgba(56,189,248,.08);
+    color:#c9e4ff;
+    animation:waitPulse 1.8s ease-in-out infinite;
+  }
+  @keyframes waitPulse{
+    0%,100%{ box-shadow:inset 0 0 0 1px rgba(56,189,248,.28),0 0 22px rgba(56,189,248,.06) }
+    50%    { box-shadow:inset 0 0 0 1px rgba(56,189,248,.5),0 0 34px rgba(56,189,248,.22) }
+  }
+  .code-line.done{
+    background:rgba(52,211,153,.12);
+    box-shadow:inset 0 0 0 1px rgba(52,211,153,.32),0 0 22px rgba(52,211,153,.08);
+    color:#a7f3d0;
+  }
+  .kw{color:#c084fc}
+  .fn{color:#fbbf24}
+  .num{color:#f472b6}
+  .cmt{color:#3d5673;font-style:italic}
+
+  /* RDR 位槽 */
+  .rdr-slot{
+    position:absolute;
+    display:flex;align-items:center;justify-content:center;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:11px;font-weight:800;
+    color:transparent;
+    border:1.5px dashed rgba(120,170,240,.22);
+    background:rgba(255,255,255,.02);
+    border-radius:5px;
+    transition:all .3s ease;
+  }
+  .rdr-slot.one{
+    border-style:solid;border-color:#34d399;
+    background:rgba(52,211,153,.22);color:#5eead4;
+    box-shadow:0 0 10px rgba(52,211,153,.45);
+  }
+  .rdr-slot.zero{
+    border-style:solid;border-color:#64748b;
+    background:rgba(100,116,139,.25);color:#cbd5e1;
+  }
+  .rdr-slot.received{
+    animation:slotPulse .45s ease;
+  }
+  @keyframes slotPulse{
+    0%{transform:scale(1)}
+    40%{transform:scale(1.28)}
+    100%{transform:scale(1)}
+  }
+  .rdr-slot.absorbed{
+    animation:slotAbsorb .35s ease forwards;
+  }
+  @keyframes slotAbsorb{
+    0%{transform:scale(1);opacity:1}
+    100%{transform:scale(0.3);opacity:0}
+  }
+  .rdr-slot-tag{
+    position:absolute;
+    font-family:ui-monospace,monospace;
+    font-size:7.5px;color:#4d6b8f;
+    text-align:center;letter-spacing:.3px;
+  }
+
+  #rdrByte{
+    position:absolute;
+    display:flex;align-items:center;justify-content:center;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:26px;font-weight:800;
+    color:transparent;
+    border:2px dashed rgba(120,170,240,.22);
+    border-radius:10px;
+    transition:all .3s ease;
+  }
+  #rdrByte.has{
+    border-style:solid;border-color:#fbbf24;
+    background:rgba(251,191,36,.16);
+    color:#fcd34d;
+    box-shadow:0 0 26px rgba(251,191,36,.5);
+  }
+  #rdrByte.full{
+    animation:byteFull .5s ease;
+  }
+  @keyframes byteFull{
+    0%{transform:translateX(-50%) scale(1)}
+    45%{transform:translateX(-50%) scale(1.14)}
+    100%{transform:translateX(-50%) scale(1)}
+  }
+  #rxne{
+    position:absolute;
+    display:flex;align-items:center;gap:7px;
+    font-family:ui-monospace,monospace;
+    font-size:10.5px;color:#3d5678;letter-spacing:1.2px;
+    transition:color .25s;
+  }
+  #rxne .led{
+    width:11px;height:11px;border-radius:50%;
+    background:#28374a;transition:all .25s;
+  }
+  #rxne.on{color:#fb7185}
+  #rxne.on .led{
+    background:#f43f5e;
+    box-shadow:0 0 14px #f43f5e,0 0 28px rgba(244,63,94,.55);
+  }
+  #rxne.pulse .led{
+    animation:ledPulse .55s ease;
+  }
+  @keyframes ledPulse{
+    0%,100%{ transform:scale(1) }
+    50%    { transform:scale(1.5) }
+  }
+
+  /* rxBuffer */
+  .mem-slot{
+    position:absolute;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    border:2px dashed rgba(120,170,240,.2);
+    border-radius:12px;
+    background:rgba(255,255,255,.016);
+    transition:all .4s ease;
+  }
+  .mem-slot .val{
+    font-size:24px;font-weight:800;line-height:1;color:transparent;
+    transition:color .35s;
+  }
+  .mem-slot .idx{
+    font-size:9px;color:#3d5a7d;margin-top:4px;letter-spacing:.5px;
+  }
+  .mem-slot.filled{
+    border-style:solid;border-color:#38bdf8;
+    background:rgba(56,189,248,.15);
+    box-shadow:0 0 26px rgba(56,189,248,.4),inset 0 0 14px rgba(56,189,248,.1);
+  }
+  .mem-slot.filled .val{color:#bae6fd}
+  .mem-slot.filled .idx{color:#7dd3fc}
+
+  /* CPU */
+  #cpu{
+    position:absolute;left:0;top:0;
+    width:44px;height:44px;border-radius:11px;
+    background:linear-gradient(150deg,#6cabff,#2563eb 58%,#1d4ed8);
+    display:flex;align-items:center;justify-content:center;
+    font-size:10px;font-weight:900;letter-spacing:.9px;color:#fff;
+    text-shadow:0 1px 3px rgba(0,0,0,.45);
+    box-shadow:0 0 26px rgba(59,130,246,.6),0 0 70px rgba(59,130,246,.2),
+               inset 0 1px 0 rgba(255,255,255,.4);
+    z-index:300;opacity:0;
+    transition:opacity .45s ease;
+    will-change:transform;
+  }
+  #cpu.visible{ opacity:1 }
+  #cpu.alert{
+    animation:cpuAlert .6s ease;
+  }
+  @keyframes cpuAlert{
+    0%{ box-shadow:0 0 26px rgba(59,130,246,.6),0 0 70px rgba(59,130,246,.2) }
+    50%{ box-shadow:0 0 40px rgba(244,63,94,.9),0 0 90px rgba(244,63,94,.4) }
+    100%{ box-shadow:0 0 26px rgba(59,130,246,.6),0 0 70px rgba(59,130,246,.2) }
+  }
+
+  .badge{
+    position:absolute;right:-13px;top:-13px;
+    width:26px;height:26px;border-radius:8px;
+    background:linear-gradient(145deg,#7dd3fc,#0ea5e9);
+    color:#03202e;font-size:13px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;
+    font-family:ui-monospace,monospace;
+    box-shadow:0 0 18px rgba(56,189,248,.9);
+    transform:scale(0);
+    transition:transform .25s cubic-bezier(.34,1.56,.64,1);
+    pointer-events:none;
+  }
+
+  /* 飞行粒子 */
+  .fly-bit{
+    position:absolute;left:0;top:0;
+    display:flex;align-items:center;justify-content:center;
+    width:26px;height:30px;border-radius:6px;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:13px;font-weight:800;
+    z-index:400;pointer-events:none;
+    will-change:transform,opacity;
+  }
+  .fly-bit.start{background:#fbbf24;color:#3a2500;box-shadow:0 0 16px rgba(251,191,36,.85)}
+  .fly-bit.stop{background:#f43f5e;color:#fff;box-shadow:0 0 16px rgba(244,63,94,.85)}
+  .fly-bit.one{background:#34d399;color:#02291b;box-shadow:0 0 14px rgba(52,211,153,.75)}
+  .fly-bit.zero{background:#4a5b70;color:#d5e2f0;box-shadow:0 0 10px rgba(74,91,112,.5)}
+
+  /* TX/RX/GND */
+  #wireSvg{
+    position:absolute;inset:0;pointer-events:none;z-index:2;
+    opacity:0;transition:opacity .5s;
+  }
+  #wireSvg.on{ opacity:1 }
+  #txWire{
+    filter:drop-shadow(0 0 6px rgba(56,189,248,.5));
+  }
+  #txWire.active{
+    filter:drop-shadow(0 0 10px rgba(56,189,248,.9));
+    stroke:#7dd3fc;
+  }
+  .wire-label{
+    position:absolute;
+    font-family:ui-monospace,monospace;
+    font-size:9.5px;font-weight:700;letter-spacing:1.5px;
+    z-index:3;
+    opacity:0;transition:opacity .5s;
+  }
+  .wire-label.on{ opacity:1 }
+
+  /* 状态栏 */
+  #status{
+    position:absolute;left:0;right:0;bottom:22px;text-align:center;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:12px;color:#5d7ea6;letter-spacing:.4px;
+    transition:color .4s;z-index:5;
+  }
+  #status.done{color:#34d399;text-shadow:0 0 20px rgba(52,211,153,.35)}
+  #replay{
+    position:absolute;right:18px;top:14px;z-index:999;
+    padding:6px 15px;border-radius:9px;cursor:pointer;
+    background:rgba(56,189,248,.09);
+    border:1px solid rgba(56,189,248,.32);
+    color:#7dd3fc;font-size:11.5px;font-family:inherit;
+    letter-spacing:.5px;transition:all .2s;
+  }
+  #replay:hover{background:rgba(56,189,248,.22);color:#e0f2fe}
+  #replay:active{transform:scale(.94)}
+</style>
+</head>
+<body>
+<div id="viewport">
+  <div id="stage">
+    <div id="title">STM32 UART 接收过程</div>
+    <div id="subtitle">HAL_StatusTypeDef status = <b>HAL_UART_Receive</b>(&amp;huart2, rxBuffer, sizeof(rxBuffer), 1000);</div>
+
+    <svg id="wireSvg" width="1200" height="720" viewBox="0 0 1200 720">
+      <line x1="300" y1="198" x2="500" y2="198" stroke="#1a2d44" stroke-width="2"/>
+      <line x1="300" y1="180" x2="500" y2="180" stroke="#1e3a5a" stroke-width="2" stroke-dasharray="4 4"/>
+      <line x1="300" y1="162" x2="500" y2="162" stroke="#0e2a44" stroke-width="3"/>
+      <line id="txWire" x1="300" y1="162" x2="500" y2="162" stroke="#38bdf8" stroke-width="2"
+            stroke-dasharray="6 6" opacity=".55">
+        <animate attributeName="stroke-dashoffset" from="0" to="-24" dur="1s" repeatCount="indefinite"/>
+      </line>
+    </svg>
+    <div class="wire-label" style="left:306px;top:150px;color:#38bdf8" id="lblTx">TX</div>
+    <div class="wire-label" style="left:306px;top:170px;color:#4d7aa8" id="lblRx">RX</div>
+    <div class="wire-label" style="left:306px;top:188px;color:#3d5a7d" id="lblGnd">GND</div>
+
+    <div id="pcPanel"   class="panel"></div>
+    <div id="convPanel" class="panel"></div>
+    <div id="codePanel" class="panel"></div>
+    <div id="rdrPanel"  class="panel"></div>
+    <div id="bufPanel"  class="panel"></div>
+
+    <div id="cpu">CPU</div>
+
+    <div id="status">准备中…</div>
+    <button id="replay">▶ 重播</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  const stage = document.getElementById('stage');
+  const sleep = ms => new Promise(r => setTimeout(r, Math.max(40, ms)));
+
+  const BASE = {
+    pc:   { x: 20,  y: 80,  w: 280, h: 200 },
+    conv: { x: 20,  y: 320, w: 380, h: 320 },
+    code: { x: 440, y: 380, w: 620, h: 240 },
+    rdr:  { x: 500, y: 80,  w: 240, h: 175 },
+    buf:  { x: 760, y: 80,  w: 300, h: 175 }
+  };
+
+  const STAGE_CX = 600;
+  const STAGE_CY = 360;
+  const FOCUS_SCALE = {
+    pc: 1.6
+  };
+
+  const DATA = [
+    { ch: 'H', byte: 0x48 },
+    { ch: 'A', byte: 0x41 },
+    { ch: 'L', byte: 0x4C },
+    { ch: '!', byte: 0x21 }
+  ];
+
+  const CPU_SIZE = 44;
+
+  const CODE_TOP  = 46;
+  const CODE_STEP = 26;
+  const CODE_LX   = 26;
+  const CPU_CODE_LX = 8;
+  const HAL_RECEIVE_LINE = 4;
+
+  const TX_Y = 162;
+  const TX_X0 = 300;
+  const TX_X1 = 500;
+
+  function mkIn(parent, tag, cls, styles){
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (styles) for (const k in styles){ try{ e.style[k] = styles[k]; }catch(_){} }
+    parent.appendChild(e);
+    return e;
+  }
+
+  const panels = {
+    pc:   document.getElementById('pcPanel'),
+    conv: document.getElementById('convPanel'),
+    code: document.getElementById('codePanel'),
+    rdr:  document.getElementById('rdrPanel'),
+    buf:  document.getElementById('bufPanel')
+  };
+
+  for (const k in panels){
+    const b = BASE[k], p = panels[k];
+    p.style.left   = b.x + 'px';
+    p.style.top    = b.y + 'px';
+    p.style.width  = b.w + 'px';
+    p.style.height = b.h + 'px';
+  }
+
+  /* PC */
+  mkIn(panels.pc, 'div', 'panel-head').textContent = 'PC · 发送方';
+  const pcMsg = mkIn(panels.pc, 'div', 'pc-msg');
+  pcMsg.innerHTML = '你好 MCU，我要发送 <span class="hl">4</span> 个字节：';
+  const pcCharsWrap = mkIn(panels.pc, 'div', 'pc-chars');
+  const pcChars = DATA.map(function(d){
+    const c = mkIn(pcCharsWrap, 'div', 'pc-char');
+    c.textContent = d.ch;
+    return c;
+  });
+
+  /* 转换面板 */
+  mkIn(panels.conv, 'div', 'panel-head').textContent = '字节 → UART 帧转换';
+  const convCharLine = mkIn(panels.conv, 'div', 'conv-char-line');
+  const convCharBig = mkIn(convCharLine, 'span', 'conv-char-big');
+  convCharBig.textContent = 'H';
+  mkIn(convCharLine, 'span', 'conv-eq').textContent = '=';
+  const convHexBig = mkIn(convCharLine, 'span', 'conv-hex-big');
+  convHexBig.textContent = '0x48';
+
+  const convLabelBin = mkIn(panels.conv, 'div', 'conv-label', { top: '96px' });
+  convLabelBin.textContent = '① 转成二进制 (MSB → LSB)';
+
+  const convLabelUart = mkIn(panels.conv, 'div', 'conv-label', { top: '186px' });
+  convLabelUart.textContent = '② 反向整体插入 UART 帧 (起始 + LSB 8 位 + 停止)';
+
+  const BIN_W = 32, BIN_GAP = 6;
+  const BIN_X0 = (380 - (8 * BIN_W + 7 * BIN_GAP)) / 2;
+  const BIN_TOP = 120;
+  const binCells = [];
+  for (let j = 0; j < 8; j++){
+    binCells.push(mkIn(panels.conv, 'div', 'bin-cell', {
+      left: (BIN_X0 + j * (BIN_W + BIN_GAP)) + 'px',
+      top: BIN_TOP + 'px'
+    }));
+  }
+
+  const UART_W = 26, UART_GAP = 3;
+  const UART_X0 = (380 - (10 * UART_W + 9 * UART_GAP)) / 2;
+  const UART_TOP = 215;
+  const uartSlots = [];
+  for (let j = 0; j < 10; j++){
+    const s = mkIn(panels.conv, 'div', 'uart-slot', {
+      left: (UART_X0 + j * (UART_W + UART_GAP)) + 'px',
+      top: UART_TOP + 'px'
+    });
+    uartSlots.push(s);
+
+    const t = mkIn(panels.conv, 'div', 'uart-tag', {
+      left: (UART_X0 + j * (UART_W + UART_GAP)) + 'px',
+      top: (UART_TOP + 34) + 'px',
+      width: UART_W + 'px'
+    });
+    t.textContent = j === 0 ? '起始' : j === 9 ? '停止' : ('b' + (j - 1));
+  }
+
+  /* 代码面板 */
+  mkIn(panels.code, 'div', 'panel-head').textContent = 'MCU 代码';
+  const CODE_LINES = [
+    '<span class="kw">uint8_t</span> rxBuffer[<span class="num">4</span>] = {<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>};',
+    '<span class="cmt">/* USER CODE END 2 */</span>',
+    '<span class="kw">while</span> (<span class="num">1</span>)',
+    '{',
+    '  <span class="fn">HAL_UART_Receive</span>(&amp;huart2, rxBuffer, <span class="kw">sizeof</span>(rxBuffer), <span class="num">1000</span>);',
+    '  <span class="fn">HAL_Delay</span>(<span class="num">1</span>);',
+    '}'
+  ];
+  const lineEls = CODE_LINES.map(function(html, i){
+    const d = mkIn(panels.code, 'div', 'code-line', {
+      left: CODE_LX + 'px',
+      right: '16px',
+      top: (CODE_TOP + i * CODE_STEP) + 'px'
+    });
+    d.innerHTML = html;
+    return d;
+  });
+
+  /* RDR */
+  mkIn(panels.rdr, 'div', 'panel-head').textContent = '接收数据寄存器 · RDR (8 位)';
+
+  const RDR_SLOT_W   = 20;
+  const RDR_SLOT_GAP = 4;
+  const RDR_SLOT_TOTAL = 8 * RDR_SLOT_W + 7 * RDR_SLOT_GAP;
+  const RDR_SLOT_X0 = (BASE.rdr.w - RDR_SLOT_TOTAL) / 2;
+  const RDR_SLOT_TOP = 42;
+
+  const rdrSlots = [];
+  for (let j = 0; j < 8; j++){
+    const sx = RDR_SLOT_X0 + j * (RDR_SLOT_W + RDR_SLOT_GAP);
+    const s = mkIn(panels.rdr, 'div', 'rdr-slot', {
+      left: sx + 'px',
+      top: RDR_SLOT_TOP + 'px',
+      width: RDR_SLOT_W + 'px',
+      height: RDR_SLOT_W + 'px'
+    });
+    rdrSlots.push(s);
+
+    const tag = mkIn(panels.rdr, 'div', 'rdr-slot-tag', {
+      left: sx + 'px',
+      top: (RDR_SLOT_TOP + RDR_SLOT_W + 2) + 'px',
+      width: RDR_SLOT_W + 'px'
+    });
+    tag.textContent = 'b' + j;
+  }
+
+  const rdrByte = mkIn(panels.rdr, 'div', '', {
+    position:'absolute',
+    left: '50%', top: '92px',
+    transform: 'translateX(-50%)',
+    width: '90px', height: '38px',
+    display:'flex', alignItems:'center', justifyContent:'center',
+    fontFamily:'ui-monospace,monospace',
+    fontSize:'24px', fontWeight:'800',
+    color:'transparent',
+    border:'2px dashed rgba(120,170,240,.22)',
+    borderRadius:'10px',
+    transition:'all .3s ease'
+  });
+  rdrByte.id = 'rdrByte';
+
+  const rxne = mkIn(panels.rdr, 'div', '', {
+    position:'absolute', left:'50%', top:'140px',
+    transform:'translateX(-50%)',
+    display:'flex', alignItems:'center', gap:'7px',
+    fontFamily:'ui-monospace,monospace',
+    fontSize:'10.5px', color:'#3d5678', letterSpacing:'1.2px',
+    transition:'color .25s'
+  });
+  rxne.id = 'rxne';
+  mkIn(rxne, 'div', '', {
+    width:'11px', height:'11px', borderRadius:'50%',
+    background:'#28374a', transition:'all .25s'
+  });
+  rxne.appendChild(document.createTextNode('RXNE'));
+
+  /* rxBuffer */
+  mkIn(panels.buf, 'div', 'panel-head').textContent = '内存 · rxBuffer[4]';
+  const MEM_W = 60, MEM_H = 60, MEM_GAP = 18;
+  const MEM_X0 = (BASE.buf.w - (4 * MEM_W + 3 * MEM_GAP)) / 2;
+  const MEM_TOP = 55;
+  const memSlots = [];
+  for (let i = 0; i < 4; i++){
+    const s = mkIn(panels.buf, 'div', 'mem-slot', {
+      left: (MEM_X0 + i * (MEM_W + MEM_GAP)) + 'px',
+      top: MEM_TOP + 'px',
+      width: MEM_W + 'px', height: MEM_H + 'px'
+    });
+    mkIn(s, 'div', 'val');
+    const idx = mkIn(s, 'div', 'idx');
+    idx.textContent = '[' + i + ']';
+    memSlots.push(s);
+  }
+
+  const cpu = document.getElementById('cpu');
+  const statusEl = document.getElementById('status');
+  const wireSvg = document.getElementById('wireSvg');
+  const txWire  = document.getElementById('txWire');
+  const lblTx   = document.getElementById('lblTx');
+  const lblRx   = document.getElementById('lblRx');
+  const lblGnd  = document.getElementById('lblGnd');
+
+  /* 聚焦 / 取消聚焦 */
+  function focusPanel(key){
+    const p = panels[key], b = BASE[key], s = FOCUS_SCALE[key];
+    if (!s || s === 1) return;
+    const bcx = b.x + b.w / 2;
+    const bcy = b.y + b.h / 2;
+    p.style.transform =
+      'translate(' + (STAGE_CX - bcx) + 'px,' + (STAGE_CY - bcy) + 'px) scale(' + s + ')';
+    p.style.zIndex = 100;
+  }
+  function unfocusPanel(key){
+    const p = panels[key];
+    p.style.transform = '';
+    setTimeout(function(){ p.style.zIndex = ''; }, 900);
+  }
+  function showPanel(key){ panels[key].classList.add('on'); }
+  function setDim(keys){
+    for (const k in panels){
+      if (keys.indexOf(k) === -1) panels[k].classList.add('dim');
+      else panels[k].classList.remove('dim');
+    }
+  }
+  function clearDim(){
+    for (const k in panels) panels[k].classList.remove('dim');
+  }
+
+  const HAL_LINE_LY = CODE_TOP + HAL_RECEIVE_LINE * CODE_STEP + 11;
+  const HAL_POS = {
+    x: BASE.code.x + CPU_CODE_LX - CPU_SIZE / 2,
+    y: BASE.code.y + HAL_LINE_LY - CPU_SIZE / 2
+  };
+
+  function setCpu(x, y){
+    cpu.style.transition = 'none';
+    cpu.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+    void cpu.offsetWidth;
+  }
+  function moveCpu(x, y, dur, ease){
+    dur = dur || 500;
+    ease = ease || 'cubic-bezier(.45,.05,.2,1)';
+    return new Promise(function(res){
+      cpu.style.transition = 'transform ' + dur + 'ms ' + ease + ', opacity .45s ease';
+      void cpu.offsetWidth;
+      cpu.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+      setTimeout(res, dur + 20);
+    });
+  }
+  function cpuToCodeLine(i, dur){
+    const lx = CPU_CODE_LX;
+    const ly = CODE_TOP + i * CODE_STEP + 11;
+    return moveCpu(BASE.code.x + lx - CPU_SIZE/2,
+                   BASE.code.y + ly - CPU_SIZE/2,
+                   dur || 340);
+  }
+  function cpuBackToHAL(dur){
+    return moveCpu(HAL_POS.x, HAL_POS.y, dur || 600);
+  }
+  function highlightLine(i){
+    lineEls.forEach(function(l){ l.classList.remove('active','waiting'); });
+    if (i >= 0 && i < lineEls.length) lineEls[i].classList.add('active');
+  }
+  function markWaiting(i){
+    lineEls.forEach(function(l){ l.classList.remove('active','waiting'); });
+    lineEls[i].classList.add('waiting');
+  }
+
+  const dynamic = [];
+  function track(el){ dynamic.push(el); return el; }
+
+  function resetAll(){
+    dynamic.forEach(function(e){ if (e && e.parentNode) e.parentNode.removeChild(e); });
+    dynamic.length = 0;
+
+    for (const k in panels){
+      panels[k].classList.remove('on','dim','converting');
+      panels[k].style.transform = '';
+      panels[k].style.zIndex = '';
+    }
+    wireSvg.classList.remove('on');
+    lblTx.classList.remove('on');
+    lblRx.classList.remove('on');
+    lblGnd.classList.remove('on');
+    txWire.classList.remove('active');
+
+    pcChars.forEach(function(c){ c.classList.remove('flash','done','converting'); });
+    lineEls.forEach(function(l){ l.classList.remove('active','waiting','done'); });
+
+    convCharLine.classList.remove('show');
+    convLabelBin.classList.remove('show');
+    convLabelUart.classList.remove('show');
+
+    binCells.forEach(function(c){
+      c.className = 'bin-cell';
+      c.textContent = '';
+      c.style.transform = 'scale(0)';
+      c.style.opacity = '';
+    });
+    uartSlots.forEach(function(s){
+      s.className = 'uart-slot';
+      s.textContent = '';
+      s.style.transform = 'scale(0)';
+    });
+
+    rdrSlots.forEach(function(s){
+      s.textContent = '';
+      s.classList.remove('one','zero','received','absorbed');
+    });
+
+    rdrByte.textContent = '';
+    rdrByte.classList.remove('has','full');
+    rxne.classList.remove('on','pulse');
+    memSlots.forEach(function(s){
+      s.classList.remove('filled');
+      s.querySelector('.val').textContent = '';
+    });
+
+    cpu.classList.remove('visible','alert');
+    while (cpu.firstChild) cpu.removeChild(cpu.firstChild);
+    cpu.textContent = 'CPU';
+
+    statusEl.textContent = '准备中…';
+    statusEl.classList.remove('done');
+  }
+
+  /* 场景 1：PC 宣布内容（聚焦） */
+  async function scenePCAnnounce(){
+    showPanel('pc');
+    focusPanel('pc');
+    setDim(['pc']);
+    statusEl.textContent = 'PC 准备发送 4 个字节：HAL!';
+    await sleep(900);
+
+    for (let i = 0; i < 4; i++){
+      pcChars[i].classList.add('flash');
+      await sleep(520);
+      pcChars[i].classList.remove('flash');
+      pcChars[i].classList.add('done');
+      await sleep(140);
+    }
+    statusEl.textContent = 'PC 发送内容：H A L !';
+    await sleep(700);
+
+    unfocusPanel('pc');
+    clearDim();
+    await sleep(900);
+  }
+
+  /* 场景 2：CPU 执行代码 */
+  async function sceneCodeRunning(){
+    showPanel('code');
+    await sleep(700);
+
+    cpu.classList.add('visible');
+    setCpu(BASE.code.x + CPU_CODE_LX - CPU_SIZE/2,
+           BASE.code.y + CODE_TOP + 11 - CPU_SIZE/2);
+    await sleep(500);
+
+    highlightLine(0);
+    await cpuToCodeLine(0, 400);
+    await sleep(650);
+
+    highlightLine(2);
+    await cpuToCodeLine(2, 420);
+    await sleep(480);
+
+    highlightLine(3);
+    await cpuToCodeLine(3, 340);
+    await sleep(380);
+
+    highlightLine(HAL_RECEIVE_LINE);
+    await cpuToCodeLine(HAL_RECEIVE_LINE, 400);
+    await sleep(900);
+
+    markWaiting(HAL_RECEIVE_LINE);
+    statusEl.textContent = '执行 HAL_UART_Receive() → 阻塞等待 4 字节数据…';
+    await sleep(600);
+  }
+
+  /* 场景 3：全部面板 + TX/RX/GND */
+  async function sceneShowAll(){
+    showPanel('pc');
+    showPanel('conv');
+    showPanel('rdr');
+    showPanel('buf');
+    await sleep(500);
+
+    wireSvg.classList.add('on');
+    lblTx.classList.add('on');
+    lblRx.classList.add('on');
+    lblGnd.classList.add('on');
+    await sleep(700);
+  }
+
+  /* 场景 4：字节 → 二进制 */
+  async function sceneToBinary(idx){
+    const d = DATA[idx];
+
+    panels.conv.classList.add('converting');
+    pcChars[idx].classList.add('converting');
+    await sleep(320);
+
+    convCharBig.textContent = d.ch;
+    convHexBig.textContent = '0x' + d.byte.toString(16).toUpperCase().padStart(2,'0');
+    convCharLine.classList.add('show');
+    await sleep(560);
+
+    binCells.forEach(function(c){
+      c.className = 'bin-cell';
+      c.textContent = '';
+      c.style.transform = 'scale(0)';
+    });
+
+    convLabelBin.classList.add('show');
+    await sleep(280);
+
+    const bits = [];
+    for (let j = 7; j >= 0; j--) bits.push((d.byte >> j) & 1);
+
+    if (idx === 0){
+      for (let j = 0; j < 8; j++){
+        const c = binCells[j];
+        c.textContent = bits[j];
+        c.classList.add(bits[j] ? 'one' : 'zero');
+        c.style.transform = 'scale(1)';
+        await sleep(j === 3 ? 480 : 260);
+      }
+      await sleep(600);
+    } else {
+      for (let j = 0; j < 8; j++){
+        const c = binCells[j];
+        c.textContent = bits[j];
+        c.classList.add(bits[j] ? 'one' : 'zero');
+      }
+      void stage.offsetWidth;
+      for (let j = 0; j < 8; j++){
+        binCells[j].style.transform = 'scale(1)';
+      }
+      await sleep(650);
+    }
+
+    statusEl.textContent = '「' + d.ch + '」→ 8 位二进制';
+    await sleep(400);
+  }
+
+  /* 场景 5：二进制 → UART 帧 */
+  async function sceneToUartFrame(idx){
+    const d = DATA[idx];
+
+    convLabelUart.classList.add('show');
+    await sleep(320);
+
+    uartSlots.forEach(function(s){
+      s.className = 'uart-slot';
+      s.textContent = '';
+      s.style.transform = 'scale(0)';
+    });
+    await sleep(260);
+
+    for (let j = 0; j < 10; j++){
+      uartSlots[j].style.transform = 'scale(1)';
+      await sleep(35);
+    }
+    await sleep(220);
+
+    uartSlots[0].textContent = '0';
+    uartSlots[0].classList.add('start');
+    await sleep(320);
+
+    if (idx === 0){
+      for (let j = 0; j < 8; j++){
+        const bit = (d.byte >> j) & 1;
+        const src = binCells[7 - j];
+        const tgt = uartSlots[j + 1];
+
+        src.classList.add('flash');
+        setTimeout(function(s){ s.classList.remove('flash'); }.bind(null, src), 300);
+
+        tgt.textContent = bit;
+        tgt.classList.add(bit ? 'one' : 'zero');
+        tgt.style.transform = 'scale(1.4)';
+        await sleep(80);
+        tgt.style.transform = 'scale(1)';
+        await sleep(280);
+      }
+      await sleep(400);
+    } else {
+      for (let j = 0; j < 8; j++){
+        binCells[7 - j].classList.add('flash');
+      }
+      await sleep(240);
+
+      for (let j = 0; j < 8; j++){
+        const bit = (d.byte >> j) & 1;
+        const tgt = uartSlots[j + 1];
+        tgt.textContent = bit;
+        tgt.classList.add(bit ? 'one' : 'zero');
+        tgt.style.transform = 'scale(1.3)';
+      }
+      await sleep(100);
+
+      for (let j = 0; j < 8; j++){
+        uartSlots[j + 1].style.transform = 'scale(1)';
+      }
+
+      setTimeout(function(){
+        binCells.forEach(function(c){ c.classList.remove('flash'); });
+      }, 380);
+
+      await sleep(560);
+    }
+
+    uartSlots[9].textContent = '1';
+    uartSlots[9].classList.add('stop');
+    await sleep(500);
+
+    statusEl.textContent = '「' + d.ch + '」已组装成 UART 帧';
+    await sleep(420);
+
+    panels.conv.classList.remove('converting');
+    pcChars[idx].classList.remove('converting');
+    await sleep(300);
+  }
+
+  /* 场景 6：10 个 bit 沿 TX 进入 RDR */
+  async function sceneTransmit(idx){
+    const d = DATA[idx];
+
+    statusEl.textContent = 'UART 帧沿 TX 线发送到 RDR…';
+    pcChars[idx].classList.add('flash');
+    await sleep(320);
+
+    const convX = BASE.conv.x;
+    const convY = BASE.conv.y;
+    const rdrX = BASE.rdr.x;
+    const rdrY = BASE.rdr.y;
+
+    rdrSlots.forEach(function(s){
+      s.textContent = '';
+      s.classList.remove('one','zero','received','absorbed');
+    });
+    rdrByte.textContent = '';
+    rdrByte.classList.remove('has','full');
+    rxne.classList.remove('on','pulse');
+
+    const uartBits = [0];
+    for (let j = 0; j < 8; j++) uartBits.push((d.byte >> j) & 1);
+    uartBits.push(1);
+
+    /* ============ 第 1 个字节：逐个传输 ============ */
+    if (idx === 0){
+      const stepDur = 200;
+
+      for (let j = 0; j < 10; j++){
+        const v = uartBits[j];
+
+        const srcSlotCenterX = convX + UART_X0 + j * (UART_W + UART_GAP) + UART_W/2;
+        const srcSlotCenterY = convY + UART_TOP + 15;
+
+        uartSlots[j].style.transform = 'scale(0)';
+
+        const fly = document.createElement('div');
+        fly.className = 'fly-bit ' +
+          (j === 0 ? 'start' : j === 9 ? 'stop' : (v ? 'one' : 'zero'));
+        fly.textContent = v;
+        stage.appendChild(fly);
+        track(fly);
+
+        fly.style.transition = 'none';
+        fly.style.transform = 'translate(' +
+          (srcSlotCenterX - 13) + 'px,' + (srcSlotCenterY - 15) + 'px) scale(1)';
+        fly.style.opacity = '1';
+        void fly.offsetWidth;
+
+        const txStartX = TX_X0 + 6 - 13;
+        const txStartY = TX_Y - 15;
+        fly.style.transition = 'transform ' + stepDur + 'ms cubic-bezier(.5,0,.3,1)';
+        fly.style.transform = 'translate(' + txStartX + 'px,' + txStartY + 'px) scale(0.85)';
+        await sleep(stepDur);
+
+        txWire.classList.add('active');
+        const txEndX = TX_X1 - 6 - 13;
+        fly.style.transition = 'transform ' + (stepDur * 1.6) + 'ms linear';
+        fly.style.transform = 'translate(' + txEndX + 'px,' + txStartY + 'px) scale(0.85)';
+        await sleep(stepDur * 1.6);
+        txWire.classList.remove('active');
+
+        let targetX, targetY, fadeOut = false;
+
+        if (j === 0){
+          targetX = TX_X0 - 40;
+          targetY = txStartY;
+          fadeOut = true;
+        } else if (j === 9){
+          targetX = TX_X1 + 40;
+          targetY = txStartY;
+          fadeOut = true;
+        } else {
+          const slotIdx = j - 1;
+          const slotLocalX = RDR_SLOT_X0 + slotIdx * (RDR_SLOT_W + RDR_SLOT_GAP) + RDR_SLOT_W/2;
+          const slotLocalY = RDR_SLOT_TOP + RDR_SLOT_W/2;
+          targetX = rdrX + slotLocalX - 13;
+          targetY = rdrY + slotLocalY - 15;
+        }
+
+        fly.style.transition = 'transform ' + stepDur + 'ms cubic-bezier(.4,0,.3,1), ' +
+                               'opacity ' + (stepDur * 0.7) + 'ms ease';
+        fly.style.transform = 'translate(' + targetX + 'px,' + targetY + 'px) scale(1)';
+        if (fadeOut) fly.style.opacity = '0';
+
+        if (j >= 1 && j <= 8){
+          setTimeout(function(si, val){
+            const slot = rdrSlots[si];
+            if (!slot) return;
+            slot.textContent = val;
+            slot.classList.add(val ? 'one' : 'zero');
+            slot.classList.add('received');
+            setTimeout(function(){ slot.classList.remove('received'); }, 500);
+          }, stepDur * 0.7, j - 1, v);
+        }
+
+        await sleep(stepDur * 0.7);
+        if (fly.parentNode) fly.parentNode.removeChild(fly);
+        await sleep(stepDur * 0.3);
+      }
+    }
+    /* ============ 后 3 个字节：10 个 bit 整体传输（慢速） ============ */
+    else {
+      const slowDur = 500;   /* ← 后三个字符整体传输的步长，更慢 */
+
+      /* ① 隐藏转换面板中的所有 UART 槽位 */
+      uartSlots.forEach(function(s){ s.style.transform = 'scale(0)'; });
+
+      /* ② 在源位置创建 10 个飞行粒子 */
+      const flyBits = [];
+      for (let j = 0; j < 10; j++){
+        const v = uartBits[j];
+        const fly = document.createElement('div');
+        fly.className = 'fly-bit ' +
+          (j === 0 ? 'start' : j === 9 ? 'stop' : (v ? 'one' : 'zero'));
+        fly.textContent = v;
+        stage.appendChild(fly);
+        track(fly);
+
+        const srcX = convX + UART_X0 + j * (UART_W + UART_GAP) + UART_W/2 - 13;
+        const srcY = convY + UART_TOP + 15 - 15;
+
+        fly.style.transition = 'none';
+        fly.style.transform = 'translate(' + srcX + 'px,' + srcY + 'px) scale(1)';
+        fly.style.opacity = '1';
+        void fly.offsetWidth;
+
+        flyBits.push(fly);
+      }
+
+      await sleep(40);
+
+      /* ③ 所有 bit 同时飞向 TX 线左端 */
+      const txStartY = TX_Y - 15;
+      for (let j = 0; j < 10; j++){
+        const txStartX = TX_X0 + 6 - 13;
+        flyBits[j].style.transition = 'transform ' + slowDur + 'ms cubic-bezier(.5,0,.3,1)';
+        flyBits[j].style.transform = 'translate(' + txStartX + 'px,' + txStartY + 'px) scale(0.85)';
+      }
+      await sleep(slowDur);
+
+      /* ④ 所有 bit 同时沿 TX 线向右滑动 */
+      txWire.classList.add('active');
+      const txEndX = TX_X1 - 6 - 13;
+      for (let j = 0; j < 10; j++){
+        flyBits[j].style.transition = 'transform ' + (slowDur * 1.6) + 'ms linear';
+        flyBits[j].style.transform = 'translate(' + txEndX + 'px,' + txStartY + 'px) scale(0.85)';
+      }
+      await sleep(slowDur * 1.6);
+      txWire.classList.remove('active');
+
+      /* ⑤ 同时进入最终位置 */
+      for (let j = 0; j < 10; j++){
+        let targetX, targetY, fadeOut = false;
+
+        if (j === 0){
+          targetX = TX_X0 - 40;
+          targetY = txStartY;
+          fadeOut = true;
+        } else if (j === 9){
+          targetX = TX_X1 + 40;
+          targetY = txStartY;
+          fadeOut = true;
+        } else {
+          const slotIdx = j - 1;
+          const slotLocalX = RDR_SLOT_X0 + slotIdx * (RDR_SLOT_W + RDR_SLOT_GAP) + RDR_SLOT_W/2;
+          const slotLocalY = RDR_SLOT_TOP + RDR_SLOT_W/2;
+          targetX = rdrX + slotLocalX - 13;
+          targetY = rdrY + slotLocalY - 15;
+        }
+
+        flyBits[j].style.transition = 'transform ' + slowDur + 'ms cubic-bezier(.4,0,.3,1), ' +
+                                      'opacity ' + (slowDur * 0.7) + 'ms ease';
+        flyBits[j].style.transform = 'translate(' + targetX + 'px,' + targetY + 'px) scale(1)';
+        if (fadeOut) flyBits[j].style.opacity = '0';
+      }
+
+      /* ⑥ 数据位同时落位 */
+      setTimeout(function(){
+        for (let j = 1; j <= 8; j++){
+          const slot = rdrSlots[j - 1];
+          const v = uartBits[j];
+          slot.textContent = v;
+          slot.classList.add(v ? 'one' : 'zero');
+          slot.classList.add('received');
+          setTimeout(function(s){ s.classList.remove('received'); }.bind(null, slot), 500);
+        }
+      }, slowDur * 0.7);
+
+      await sleep(slowDur * 1.1);
+
+      /* ⑦ 清除所有飞行粒子 */
+      flyBits.forEach(function(fly){
+        if (fly.parentNode) fly.parentNode.removeChild(fly);
+      });
+
+      await sleep(300);
+    }
+
+    await sleep(420);
+
+    rdrByte.textContent = d.ch;
+    rdrByte.classList.add('has');
+    rdrByte.classList.add('full');
+    setTimeout(function(){ rdrByte.classList.remove('full'); }, 520);
+    rxne.classList.add('on');
+    rxne.classList.add('pulse');
+    setTimeout(function(){ rxne.classList.remove('pulse'); }, 580);
+
+    pcChars[idx].classList.remove('flash');
+    pcChars[idx].classList.add('done');
+
+    statusEl.textContent = '⚠ RDR 已满 → RXNE = 1 → 通知 CPU 搬走';
+    await sleep(600);
+  }
+
+  /* 场景 7：CPU 一次性吸收 8 bit → 搬运 */
+  async function sceneFetch(idx){
+    const d = DATA[idx];
+
+    lineEls[HAL_RECEIVE_LINE].classList.remove('waiting');
+    lineEls[HAL_RECEIVE_LINE].classList.add('active');
+
+    cpu.classList.add('alert');
+    await sleep(320);
+    cpu.classList.remove('alert');
+
+    statusEl.textContent = 'CPU 离开 HAL_UART_Receive 行 → 前往 RDR 一次性吸收 8 个 bit';
+    await sleep(300);
+
+    const rdrCx = BASE.rdr.x + BASE.rdr.w / 2;
+    const absorbY = BASE.rdr.y + BASE.rdr.h + 45;
+    await moveCpu(rdrCx - CPU_SIZE/2, absorbY - CPU_SIZE/2, 650);
+    await sleep(220);
+
+    const slotCenterY = BASE.rdr.y + RDR_SLOT_TOP + RDR_SLOT_W / 2;
+
+    const flyBits = [];
+    for (let j = 0; j < 8; j++){
+      const slot = rdrSlots[j];
+      const val = slot.textContent;
+      if (val === '') continue;
+
+      const cls = slot.classList.contains('one') ? 'one' : 'zero';
+      const slotCenterX = BASE.rdr.x + RDR_SLOT_X0 +
+                          j * (RDR_SLOT_W + RDR_SLOT_GAP) + RDR_SLOT_W / 2;
+
+      const fly = document.createElement('div');
+      fly.className = 'fly-bit ' + cls;
+      fly.textContent = val;
+      fly.style.width = '20px';
+      fly.style.height = '20px';
+      fly.style.fontSize = '11px';
+      fly.style.borderRadius = '5px';
+      stage.appendChild(fly);
+      track(fly);
+
+      fly.style.transition = 'none';
+      fly.style.transform = 'translate(' + (slotCenterX - 10) + 'px,' +
+                            (slotCenterY - 10) + 'px) scale(1)';
+      fly.style.opacity = '1';
+      void fly.offsetWidth;
+
+      slot.classList.add('absorbed');
+
+      flyBits.push(fly);
+    }
+
+    await sleep(40);
+
+    flyBits.forEach(function(fly){
+      fly.style.transition = 'transform 450ms cubic-bezier(.5,0,.3,1), opacity 260ms 240ms';
+      fly.style.transform = 'translate(' + (rdrCx - 10) + 'px,' +
+                            (absorbY - 10) + 'px) scale(0.3)';
+      fly.style.opacity = '0';
+    });
+
+    await sleep(520);
+
+    flyBits.forEach(function(fly){
+      if (fly.parentNode) fly.parentNode.removeChild(fly);
+    });
+
+    rdrByte.classList.remove('has');
+    rdrByte.textContent = '';
+    rxne.classList.remove('on');
+
+    rdrSlots.forEach(function(s){
+      s.textContent = '';
+      s.classList.remove('one','zero','absorbed');
+    });
+
+    const badge = document.createElement('div');
+    badge.className = 'badge';
+    badge.textContent = d.ch;
+    cpu.appendChild(badge);
+    track(badge);
+    await sleep(30);
+    badge.style.transform = 'scale(1)';
+    await sleep(320);
+
+    statusEl.textContent = 'CPU 从 8 个 bit 还原出「' + d.ch + '」→ 搬运到 rxBuffer[' + idx + ']';
+    await sleep(320);
+
+    const targetX = BASE.buf.x + MEM_X0 + idx * (MEM_W + MEM_GAP) + MEM_W / 2;
+    const targetY = BASE.buf.y + MEM_TOP + MEM_H / 2;
+
+    await moveCpu(targetX - CPU_SIZE/2, targetY - CPU_SIZE/2, 800);
+    await sleep(180);
+
+    badge.style.transform = 'scale(0)';
+    memSlots[idx].querySelector('.val').textContent = d.ch;
+    memSlots[idx].classList.add('filled');
+    await sleep(280);
+    if (badge.parentNode) badge.parentNode.removeChild(badge);
+
+    statusEl.textContent = '已存入 rxBuffer[' + idx + '] → CPU 返回代码行';
+    await sleep(400);
+
+    await cpuBackToHAL(720);
+    await sleep(180);
+
+    lineEls[HAL_RECEIVE_LINE].classList.remove('active');
+    lineEls[HAL_RECEIVE_LINE].classList.add('waiting');
+
+    if (idx < 3){
+      statusEl.textContent = 'CPU 回到 HAL_UART_Receive 行，继续等待下一个字节…';
+    } else {
+      statusEl.textContent = 'CPU 回到 HAL_UART_Receive 行，4 字节已全部收齐';
+    }
+    await sleep(450);
+  }
+
+  /* 场景 8 */
+  async function sceneBackToCode(){
+    statusEl.textContent = '4 字节接收完成，HAL_UART_Receive 返回 HAL_OK';
+    await sleep(500);
+
+    lineEls[HAL_RECEIVE_LINE].classList.remove('waiting','active');
+    lineEls[HAL_RECEIVE_LINE].classList.add('done');
+    await sleep(400);
+
+    highlightLine(5);
+    await cpuToCodeLine(5, 400);
+    await sleep(520);
+
+    highlightLine(6);
+    await cpuToCodeLine(6, 340);
+    await sleep(420);
+
+    highlightLine(2);
+    await cpuToCodeLine(2, 420);
+    await sleep(500);
+
+    statusEl.textContent =
+      '✓ rxBuffer = { \'' +
+      DATA.map(function(d){ return d.ch; }).join("', '") +
+      '\' } · 循环继续';
+    statusEl.classList.add('done');
+  }
+
+  let running = false;
+
+  async function run(){
+    if (running) return;
+    running = true;
+
+    try {
+      resetAll();
+      await sleep(600);
+
+      await scenePCAnnounce();
+      await sceneCodeRunning();
+      await sceneShowAll();
+
+      for (let i = 0; i < 4; i++){
+        await sceneToBinary(i);
+        await sceneToUartFrame(i);
+        await sceneTransmit(i);
+        await sceneFetch(i);
+      }
+
+      await sceneBackToCode();
+
+    } catch(err){
+      console.error(err);
+      statusEl.textContent = '出错：' + err.message;
+    }
+
+    running = false;
+  }
+
+  function fit(){
+    let s = Math.min(window.innerWidth / 1240, window.innerHeight / 760, 1.3);
+    if (s < 0.3) s = 0.3;
+    stage.style.transform = 'scale(' + s + ')';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  document.getElementById('replay').addEventListener('click', function(){
+    if (running) return;
+    run();
+  });
+
+  setTimeout(run, 700);
+
+})();
+</script>
+</body>
+</html>

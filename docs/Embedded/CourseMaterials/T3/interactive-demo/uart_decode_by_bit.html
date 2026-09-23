@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>UART · 方块解码</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0c1423;color:#e8eef8;font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif}main{max-width:1140px;margin:auto;padding:28px 24px}header{display:flex;justify-content:space-between;align-items:center;gap:20px}h1{font-size:26px;margin:0 0 8px;letter-spacing:.04em}p{color:#97a9c2;margin:0;font-size:14px;line-height:1.7}.tag{font-size:12px;color:#9eafc5;letter-spacing:.15em}.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:24px 0 12px}button,select{background:#1b2a42;border:1px solid #3a4b65;color:#ecf2ff;border-radius:9px;padding:10px 16px;font:inherit;cursor:pointer}button:hover{background:#2b3e5d}button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid #6bb7ff;outline-offset:3px}#play{background:#e4efff;color:#14243e;border-color:#e4efff;min-width:100px}label{font-size:13px;color:#adc0d8;display:flex;align-items:center;gap:8px}.spacer{flex:1}.stage{border:1px solid #2a3850;border-radius:16px;background:#101c2e;overflow:auto}svg{width:100%;min-width:740px;display:block}svg text{font-family:inherit}#status{margin:18px 0 6px;font-size:20px;min-height:30px}#detail{min-height:48px}.progress{display:flex;align-items:center;gap:14px;margin-top:14px}input[type=range]{width:100%;accent-color:#83b7ff}#counter{font-size:12px;color:#9db0c9;white-space:nowrap}.foot{margin-top:14px;font-size:12px;color:#8396b1}.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;font-size:13px;color:#b5c4d9}.dot{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px}@media(max-width:600px){main{padding:18px 12px}header{align-items:start}.tag{display:none}h1{font-size:22px}.spacer{display:none}.controls{gap:7px}button,select{padding:10px}#status{font-size:17px}}
+</style></head><body><main>
+<header><div><h1>让每一位，回到它的位置</h1><p>UART 数据包 · 复制、位移、位或合并、掩码位与</p></div><div class="tag">BIT BY BIT / 56 BITS</div></header>
+<div class="controls"><button id="play">▶ 播放</button><button id="prev">上一步</button><button id="next">下一步</button><button id="restart">重播</button><span class="spacer"></span><label>数据<select id="field"><option value="0">红色 · 13 位</option><option value="1">蓝色 · 13 位</option><option value="2">黄色 · 10 位</option><option value="3">绿色 · 10 位</option><option value="4">白色 · 10 位</option></select></label><label>速度<select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select></label></div>
+<div id="status" aria-live="polite"></div><p id="detail"></p>
+<div class="stage"><svg id="scene" viewBox="0 0 1080 770" role="img" aria-label="上方原始七行八列保持不变；下方复制方块展示移位、位或和位与过程"><g id="static"></g><g id="moving"></g></svg></div>
+<div class="progress"><input id="seek" type="range" min="0" value="0" step="0.01" aria-label="动画进度"><span id="counter"></span></div>
+<div class="legend"><span><i class="dot" style="background:#f44e63"></i>红色 13 位</span><span><i class="dot" style="background:#19b7e5"></i>蓝色 13 位</span><span><i class="dot" style="background:#f3d84b"></i>黄色 10 位</span><span><i class="dot" style="background:#91d15f"></i>绿色 10 位</span><span><i class="dot" style="background:#d9e1ec"></i>白色 10 位</span></div>
+<p class="foot">色块表示原始数据位，并不假定它的值为 1。灰色 0 是补零或清零；掩码 1 保留对应数据位。原图未提供具体数值。逐格位移是分解演示，不代表硬件逐次执行。</p>
+</main><script>
+(()=>{'use strict';
+const $=id=>document.getElementById(id), NS='http://www.w3.org/2000/svg';
+const C={R:'#f44e63',B:'#19b7e5',Y:'#f3d84b',G:'#91d15f',U:'#d9e1ec',Z:'#23334b',M:'#e5edf9'};
+const rows=['RRRRRRRR','BBBRRRRR','BBBBBBBB','YYYYYYBB','GGGGYYYY','UUGGGGGG','UUUUUUUU'];
+const fields=[{name:'红色',c:'R',rows:[0,1],shift:0,n:13},{name:'蓝色',c:'B',rows:[1,2,3],shift:5,n:13},{name:'黄色',c:'Y',rows:[3,4],shift:2,n:10},{name:'绿色',c:'G',rows:[4,5],shift:4,n:10},{name:'白色',c:'U',rows:[5,6],shift:6,n:10}];
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e}
+function text(x,y,s,size=14,color='#9dafc8',parent=$('static')){const e=el('text',{x,y,fill:color,'font-size':size},parent);e.textContent=s;return e}
+function tile(parent,x,y,c,label='',size=28){let g=el('g',{},parent);el('rect',{x,y,width:size-3,height:size-3,rx:4,fill:C[c],stroke:c==='Z'?'#3b506d':'none'},g);{let t=text(x+(size-3)/2,y+(size-3)/2+5,label,13,c==='Z'?'#8195b0':'#17263b',g);t.setAttribute('text-anchor','middle')}return g}
+text(28,32,'原始数据 · 7 行 × 8 列',16,'#e0eaf9');text(28,55,'仅复制，原始方块始终保留',12);
+for(let j=0;j<8;j++)text(162+j*32,80,String(7-j),12);
+rows.forEach((r,i)=>{text(28,108+i*29,'第 '+(i+1)+' 行',13);for(let j=0;j<8;j++)tile($('static'),151+j*32,89+i*29,r[j], '',29)});
+text(480,32,'已提取的数据',16,'#e0eaf9');
+fields.forEach((f,i)=>{text(480,88+i*51,f.name+' · '+f.n+' 位',13);for(let b=0;b<f.n;b++)el('rect',{x:593+b*29,y:69+i*51,width:25,height:25,rx:4,fill:'#15233a',stroke:'#2b3d57'},$('static'))});
+el('line',{x1:28,y1:315,x2:1052,y2:315,stroke:'#304158'},$('static'));
+text(28,346,'运算区',16,'#e0eaf9');
+let states=[],tokens={},labels=[],high=[],seq=0,curField=0;
+const clone=o=>JSON.parse(JSON.stringify(o));
+function save(title,detail,duration=1200){states.push({tokens:clone(tokens),labels:clone(labels),high:[...high],title,detail,duration,field:curField})}
+function add(id,x,y,c,txt='',size=32){tokens[id]={x,y,c,txt,size,a:1}}
+function zero(id,x,y){add(id,x,y,'Z','0')}
+function lx(bit,w){return 226+(w-1-bit)*32}
+function lane(y,name){labels.push({x:28,y:y+19,s:name})}
+fields.forEach((f,fi)=>{curField=fi;high=f.rows;labels=[];for(const id of Object.keys(tokens))if(!id.startsWith('bank'))delete tokens[id];const w=f.rows.length*8;let operands=[];
+save(f.name+' · 聚焦第 '+f.rows.map(x=>x+1).join('、')+' 行','从原始数据复制对应行；原始 7×8 方块保持不动。',1000);
+f.rows.forEach((r,k)=>{const a=[];for(let b=0;b<8;b++){let id='f'+fi+'r'+r+'b'+b;add(id,151+(7-b)*32,89+r*29,rows[r][7-b],'',29);a.push({id,bit:b,c:rows[r][7-b]})}operands.push(a)});
+save('复制 '+f.name+' 所在的字节','方块副本将进入下方运算区。',550);
+operands.forEach((a,k)=>{lane(393+k*61,'第 '+(f.rows[k]+1)+' 行');a.forEach(t=>Object.assign(tokens[t.id],{x:lx(t.bit,w),y:393+k*61,size:32}));for(let b=8;b<w;b++)zero('pad'+fi+'-'+k+'-'+b,lx(b,w),393+k*61)});
+labels.push({x:226,y:373,s:'高位 ←                                    → 低位'});
+save('复制到 '+w+' 位运算空间','每行先放在低 8 位，左侧高位补 0。',1500);
+operands.forEach((a,k)=>{
+if(k===0)return;
+let padding=[];
+for(let b=8;b<w;b++)padding.push({id:'pad'+fi+'-'+k+'-'+b,bit:b});
+for(let step=1;step<=8*k;step++){
+  a.forEach(t=>{t.bit++;tokens[t.id].x=lx(t.bit,w)});
+  padding.forEach(t=>{t.bit++;if(t.bit>=w)delete tokens[t.id];else tokens[t.id].x=lx(t.bit,w)});
+  padding=padding.filter(t=>t.bit<w);
+  const id='shiftzero'+fi+'-'+k+'-'+step;
+  zero(id,lx(0,w),393+k*61);padding.push({id,bit:0});
+  save('第 '+(f.rows[k]+1)+' 行左移 · '+step+' / '+8*k+' 位','方块向左移动一格，最低位补一个 0；已经补入的 0 也跟着向左移动。',440);
+}
+save('逐格补 0 · 左移 '+8*k+' 位完成',fi===0?'现在高 8 位是蓝色 3 位、红色 5 位，低 8 位全部为 0。':'移位后，各字节占据不同的位区间。',950);
+});
+let merged=Array(w).fill('Z');operands.flat().forEach(t=>merged[t.bit]=t.c);
+labels.push({x:28,y:613,s:'位或 · 合并'});save('位或 OR · 逐列合并','同一列向下靠拢：数据位与 0 做位或，保留该数据位。',1100);
+for(let b=w-1;b>=0;b--){const x=lx(b,w);for(const id of Object.keys(tokens)){const t=tokens[id];if(!id.startsWith('bank')&&Math.abs(t.x-x)<1&&t.y<580){t.y=594;t.a=0}}add('or'+fi+'-'+b,x,594,merged[b],merged[b]==='Z'?'0':'');save('位或 OR · 第 '+b+' 位','数据位与 0 重合，保留原数据；各字节合成一排。',155)}
+for(const id of Object.keys(tokens))if(!id.startsWith('bank')&&!id.startsWith('or'+fi))delete tokens[id];labels=[];lane(440,'合并结果');for(let b=0;b<w;b++)tokens['or'+fi+'-'+b].y=440;
+save('位或完成',fi===0?'高 3 位是蓝色，低 13 位是红色。':'字节已按顺序合并，现在对齐目标数据。',1300);
+let mergedIds=Array.from({length:w},(_,b)=>'or'+fi+'-'+b);
+if(f.shift){
+let discarded=null;
+for(let step=1;step<=f.shift;step++){
+  if(discarded)delete tokens[discarded];
+  discarded=mergedIds[0];
+  tokens[discarded].x=lx(0,w)+32;tokens[discarded].a=0;
+  mergedIds=mergedIds.slice(1);
+  mergedIds.forEach((id,b)=>{tokens[id].x=lx(b,w)});
+  const id='rightzero'+fi+'-'+step;
+  zero(id,lx(w-1,w),440);mergedIds.push(id);
+  merged=merged.slice(1).concat('Z');
+  save('逐位右移 · '+step+' / '+f.shift+' 位','整排向右移动一格，左侧补一个 0，最右侧的一位移出并消失。',440);
+}
+if(discarded)delete tokens[discarded];
+save('右移完成 · 高位已补 0','数据保持在右移后的原位，继续进行掩码筛选。',900);
+}
+lane(516,'掩码 MASK');for(let b=0;b<w;b++)add('mask'+fi+'-'+b,lx(b,w),516,b<f.n?'M':'Z',b<f.n?'1':'0');lane(610,'位与 · 筛选');save('掩码 · 低 '+f.n+' 位为 1','高 '+(w-f.n)+' 位为 0，低 '+f.n+' 位为 1：与 1 保留，与 0 清零。',1500);
+for(let b=w-1;b>=0;b--){for(const id of [mergedIds[b],'mask'+fi+'-'+b]){tokens[id].y=590;tokens[id].a=0}add('out'+fi+'-'+b,lx(b,w),590,b<f.n?merged[b]:'Z',b<f.n?'':'0');save('位与 AND · 第 '+b+' 位',b<f.n?'掩码是 1：保留这一位'+f.name+'数据。':'掩码是 0：这一位清零，其他颜色消失。',200)}
+save(f.name+' · 筛选完成','高 '+(w-f.n)+' 位全部为 0，低 '+f.n+' 位保留'+f.name+'数据。',1500);
+for(const id of Object.keys(tokens))if(!id.startsWith('bank')&&!id.startsWith('out'+fi))delete tokens[id];labels=[];for(let b=0;b<w;b++){let id='out'+fi+'-'+b;if(b>=f.n){tokens[id].a=0;continue}let t=tokens[id];t.x=593+(f.n-1-b)*29;t.y=69+fi*51;t.size=28}
+save('收好 '+f.name+' · '+f.n+' 位',fi===fields.length-1?'白色结果移到右上方，五组数据全部提取完成。':'提取结果移到右上方；接着处理下一组数据。',1700);
+for(let b=0;b<f.n;b++){tokens['bank'+fi+'-'+b]=tokens['out'+fi+'-'+b];delete tokens['out'+fi+'-'+b]}
+});
+curField=4;high=[];labels=[];for(const id of Object.keys(tokens))if(!id.startsWith('bank'))delete tokens[id];save('五组数据，全部提取完成','红色 13 位 · 蓝色 13 位 · 黄色 10 位 · 绿色 10 位 · 白色 10 位。',1400);
+let times=[0];for(let i=1;i<states.length;i++)times[i]=times[i-1]+states[i].duration;const total=times.at(-1);$('seek').max=total;
+const moving=$('moving');let nodes=new Map(), lastIndex=-1,playing=false,pos=0,lastTime=0;
+function render(){let i=0;while(i<states.length-1&&times[i+1]<=pos)i++;let a=states[i],b=states[Math.min(i+1,states.length-1)],raw=i===states.length-1?0:(pos-times[i])/(times[i+1]-times[i]),t=raw*raw*(3-2*raw);let ids=new Set([...Object.keys(a.tokens),...Object.keys(b.tokens)]);for(const [id,node]of nodes)if(!ids.has(id)){node.remove();nodes.delete(id)}
+for(const id of ids){let A=a.tokens[id],B=b.tokens[id];if(!A)A={...B,a:0};if(!B)B={...A,a:0};let node=nodes.get(id);if(!node){node=tile(moving,0,0,B.c,B.txt,32);nodes.set(id,node)}let size=A.size+(B.size-A.size)*t;node.setAttribute('transform','translate('+(A.x+(B.x-A.x)*t)+','+(A.y+(B.y-A.y)*t)+') scale('+(size/32)+')');node.setAttribute('opacity',A.a+(B.a-A.a)*t);node.firstChild.setAttribute('fill',C[B.c]);node.firstChild.setAttribute('stroke',B.c==='Z'?'#3b506d':'none');node.lastChild.textContent=B.txt;node.lastChild.setAttribute('fill',B.c==='Z'?'#8195b0':'#17263b');}
+let active=raw>0?b:a;if(lastIndex!==states.indexOf(active)){lastIndex=states.indexOf(active);$('status').textContent=active.title;$('detail').textContent=active.detail;$('field').value=active.field;document.querySelectorAll('.dynamic').forEach(n=>n.remove());active.labels.forEach(l=>text(l.x,l.y,l.s,13,'#a7bad4').classList.add('dynamic'));active.high.forEach(r=>{el('rect',{x:143,y:85+r*29,width:265,height:29,rx:5,fill:'none',stroke:'#d8e7ff','stroke-width':1.5,class:'dynamic'},$('static'))})}
+$('seek').value=pos;$('counter').textContent=Math.round(pos/total*100)+'%';}
+function setPlaying(v){playing=v;$('play').textContent=v?'Ⅱ 暂停':'▶ 播放'}
+$('play').onclick=()=>{if(pos>=total)pos=0;setPlaying(!playing);render()};$('restart').onclick=()=>{pos=0;setPlaying(true);render()};$('next').onclick=()=>{setPlaying(false);pos=times.find(x=>x>pos+1)??total;render()};$('prev').onclick=()=>{setPlaying(false);pos=[...times].reverse().find(x=>x<pos-1)??0;render()};$('seek').oninput=e=>{setPlaying(false);pos=+e.target.value;render()};$('field').onchange=e=>{setPlaying(false);pos=times[states.findIndex(s=>s.field===+e.target.value)];render()};
+function loop(now){if(playing){pos=Math.min(total,pos+Math.min(now-lastTime,80)*+$('speed').value);render();if(pos>=total)setPlaying(false)}lastTime=now;requestAnimationFrame(loop)}render();requestAnimationFrame(loop);
+window.animationCheck={rows,fields,states,times,total};
+})();
+</script></body></html>

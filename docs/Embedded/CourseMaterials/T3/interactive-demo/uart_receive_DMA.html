@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>STM32 UART + DMA 接收</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#02040a;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
+  #viewport{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  #stage{position:relative;width:1200px;height:720px;flex:none;background:radial-gradient(circle at 18% 8%,#0c1728 0%,#060b16 58%,#02040a 100%);border:1px solid rgba(120,180,255,.08);border-radius:24px;overflow:hidden;transform-origin:center center;box-shadow:0 40px 100px rgba(0,0,0,.8)}
+
+  #title{position:absolute;top:14px;left:0;right:0;text-align:center;font-size:17px;font-weight:700;letter-spacing:3px;color:#c9e0ff;text-shadow:0 0 26px rgba(56,189,248,.3);z-index:5}
+  #subtitle{position:absolute;top:38px;left:0;right:0;text-align:center;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;color:#33506f;letter-spacing:.3px;z-index:5}
+  #subtitle b{color:#38bdf8;font-weight:600}
+
+  .panel{position:absolute;background:rgba(255,255,255,.024);border:1px solid rgba(120,170,240,.14);border-radius:18px;opacity:0;transition:opacity .55s ease, box-shadow .4s ease, border-color .4s ease;box-shadow:0 14px 40px rgba(0,0,0,.45)}
+  .panel.on{opacity:1}
+  .panel-head{position:absolute;left:16px;top:11px;font-size:11px;font-weight:600;letter-spacing:1.2px;color:#6d93bd;white-space:nowrap}
+
+  /* PC */
+  #pcPanel .pc-msg{position:absolute;left:16px;top:36px;right:16px;font-size:12px;color:#a7c9ec;letter-spacing:.4px;font-family:ui-monospace,"PingFang SC",monospace}
+  .pc-char{position:absolute;display:flex;align-items:center;justify-content:center;border-radius:10px;border:2px solid rgba(120,170,240,.22);background:rgba(255,255,255,.025);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:24px;font-weight:800;color:#54759c;transition:all .3s ease}
+  .pc-char.sending{border-color:#38bdf8;background:rgba(56,189,248,.22);color:#dbeafe;box-shadow:0 0 26px rgba(56,189,248,.7);transform:translateY(-4px) scale(1.1)}
+  .pc-char.done{border-color:rgba(52,211,153,.55);background:rgba(52,211,153,.09);color:#6ee7b7}
+
+  /* RDR */
+  #rdrSlot{position:absolute;left:50%;top:60px;transform:translate(-50%,0);width:80px;height:56px;border:2px dashed rgba(120,170,240,.22);border-radius:12px;background:rgba(255,255,255,.012);transition:all .3s ease}
+  #rdrSlot.has{border-style:solid;border-color:#fbbf24;background:rgba(251,191,36,.08);box-shadow:0 0 26px rgba(251,191,36,.45),inset 0 0 18px rgba(251,191,36,.08)}
+  #rdrSlot.emptied{border-color:rgba(120,170,240,.15);background:transparent;box-shadow:none}
+
+  #rxne{position:absolute;display:flex;align-items:center;gap:7px;font-family:ui-monospace,monospace;font-size:10.5px;color:#3d5678;letter-spacing:1.2px;transition:color .25s}
+  #rxne .led{width:10px;height:10px;border-radius:50%;background:#28374a;transition:all .25s}
+  #rxne.on{color:#fb7185}
+  #rxne.on .led{background:#f43f5e;box-shadow:0 0 12px #f43f5e,0 0 24px rgba(244,63,94,.55)}
+  #rxne.pulse .led{animation:ledPulse .5s ease}
+  @keyframes ledPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.7)}}
+
+  /* DMA 面板 */
+  #dmaPanel{
+    background:linear-gradient(145deg,rgba(168,85,247,.10) 0%,rgba(139,92,246,.06) 100%);
+    border-color:rgba(168,85,247,.35);
+    box-shadow:0 14px 40px rgba(0,0,0,.45),
+               0 0 30px rgba(168,85,247,.15),
+               inset 0 0 30px rgba(168,85,247,.05);
+  }
+  #dmaPanel .panel-head{
+    color:#c4a5f5;
+    text-shadow:0 0 8px rgba(168,85,247,.5);
+  }
+  #dmaPanel.active{
+    border-color:rgba(216,180,254,.85);
+    box-shadow:0 0 0 2px rgba(168,85,247,.4),
+               0 0 50px rgba(168,85,247,.55),
+               0 14px 40px rgba(0,0,0,.45),
+               inset 0 0 40px rgba(168,85,247,.15);
+  }
+  #dmaBelt{
+    position:absolute;
+    left:14px;right:14px;top:52px;
+    height:36px;
+    border-radius:8px;
+    background:rgba(168,85,247,.10);
+    border:1px solid rgba(168,85,247,.35);
+    overflow:hidden;
+    box-shadow:inset 0 0 20px rgba(168,85,247,.15);
+  }
+  #dmaBelt::before{
+    content:'';
+    position:absolute;inset:0;
+    background:repeating-linear-gradient(
+      90deg,
+      transparent 0px, transparent 12px,
+      rgba(200,160,255,.30) 12px, rgba(200,160,255,.30) 16px
+    );
+    animation:beltMove 1.2s linear infinite;
+    opacity:.4;
+    transition:opacity .3s;
+  }
+  #dmaPanel.active #dmaBelt::before{
+    opacity:1;
+    animation-duration:.5s;
+  }
+  @keyframes beltMove{
+    from{background-position:0 0}
+    to{background-position:32px 0}
+  }
+  .dma-port{
+    position:absolute;
+    width:16px;height:26px;
+    top:57px;
+    border-radius:4px;
+    background:rgba(168,85,247,.22);
+    border:1.5px solid rgba(200,160,255,.55);
+    box-shadow:0 0 10px rgba(168,85,247,.5);
+    transition:all .3s;
+  }
+  .dma-port.l{left:-8px}
+  .dma-port.r{right:-8px}
+  #dmaPanel.active .dma-port{
+    background:rgba(216,180,254,.5);
+    box-shadow:0 0 18px rgba(216,180,254,.9);
+  }
+  #dmaProgress{
+    position:absolute;
+    left:14px;right:14px;
+    top:100px;
+    display:flex;
+    justify-content:space-between;
+    gap:4px;
+  }
+  #dmaProgress .dma-dot{
+    flex:1;
+    height:6px;
+    border-radius:3px;
+    background:rgba(168,85,247,.15);
+    border:1px solid rgba(168,85,247,.3);
+    transition:all .3s;
+  }
+  #dmaProgress .dma-dot.filled{
+    background:linear-gradient(90deg,#a855f7,#d8b4fe);
+    border-color:#d8b4fe;
+    box-shadow:0 0 12px rgba(168,85,247,.85);
+  }
+
+  /* rxBuffer */
+  .mem-slot{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:ui-monospace,Menlo,Consolas,monospace;border:2px dashed rgba(120,170,240,.2);border-radius:12px;background:rgba(255,255,255,.016);transition:all .4s ease}
+  .mem-slot .val{font-size:22px;font-weight:800;line-height:1;color:transparent;transition:color .35s}
+  .mem-slot .idx{font-size:9px;color:#3d5a7d;margin-top:4px;letter-spacing:.5px}
+  .mem-slot.filled{border-style:solid;border-color:#a855f7;background:rgba(168,85,247,.16);box-shadow:0 0 26px rgba(168,85,247,.45),inset 0 0 14px rgba(168,85,247,.12)}
+  .mem-slot.filled .val{color:#e9d5ff}
+  .mem-slot.filled .idx{color:#c4a5f5}
+
+  /* 代码行 */
+  .code-line{position:absolute;display:flex;align-items:center;padding:0 12px;border-radius:8px;font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:12.5px;line-height:1;white-space:pre;color:#7f9cbe;transition:background .3s,box-shadow .3s,color .3s}
+  .code-line.running{background:rgba(56,189,248,.10);box-shadow:inset 0 0 0 1px rgba(56,189,248,.28),0 0 24px rgba(56,189,248,.10);color:#c9e4ff;animation:runPulse 2s ease-in-out infinite}
+  @keyframes runPulse{0%,100%{box-shadow:inset 0 0 0 1px rgba(56,189,248,.28),0 0 20px rgba(56,189,248,.08)}50%{box-shadow:inset 0 0 0 1px rgba(56,189,248,.5),0 0 32px rgba(56,189,248,.22)}}
+  .code-line.interrupt{background:rgba(244,63,94,.18);box-shadow:inset 0 0 0 1px rgba(244,63,94,.6),0 0 30px rgba(244,63,94,.25);color:#fecdd3;animation:interruptFlash .5s ease}
+  @keyframes interruptFlash{0%{background:rgba(244,63,94,.05)}40%{background:rgba(244,63,94,.4)}100%{background:rgba(244,63,94,.18)}}
+  .code-line.active{background:rgba(56,189,248,.16);box-shadow:inset 0 0 0 1px rgba(56,189,248,.45),0 0 26px rgba(56,189,248,.15);color:#e0f2fe}
+  .code-line.done{background:rgba(52,211,153,.12);box-shadow:inset 0 0 0 1px rgba(52,211,153,.32);color:#a7f3d0}
+  .code-line.dmaHighlight{background:rgba(168,85,247,.14);box-shadow:inset 0 0 0 1px rgba(168,85,247,.4),0 0 26px rgba(168,85,247,.15);color:#e9d5ff}
+  .kw{color:#c084fc}.fn{color:#fbbf24}.num{color:#f472b6}.cmt{color:#3d5673;font-style:italic}.var{color:#7dd3fc}.macro{color:#fda4af}.pp{color:#a78bfa}
+
+  .panel-tag{position:absolute;right:14px;top:10px;font-family:ui-monospace,monospace;font-size:9.5px;font-weight:700;letter-spacing:1.5px;padding:3px 9px;border-radius:20px;opacity:0;transition:opacity .3s}
+  .panel-tag.show{opacity:1}
+  #loopTag{color:#7dd3fc;border:1px solid rgba(56,189,248,.4);background:rgba(56,189,248,.08)}
+  #cbTag{color:#fbbf24;border:1px solid rgba(251,191,36,.5);background:rgba(251,191,36,.1)}
+
+  /* CPU */
+  #cpu{position:absolute;left:0;top:0;width:44px;height:44px;border-radius:11px;background:linear-gradient(150deg,#6cabff,#2563eb 58%,#1d4ed8);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;letter-spacing:.9px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.45);box-shadow:0 0 26px rgba(59,130,246,.6),0 0 70px rgba(59,130,246,.2),inset 0 1px 0 rgba(255,255,255,.4);z-index:300;opacity:0;transition:opacity .45s ease;will-change:transform}
+  #cpu.visible{opacity:1}
+  #cpu.grabbed{box-shadow:0 0 50px rgba(251,191,36,1),0 0 100px rgba(251,191,36,.6),inset 0 1px 0 rgba(255,255,255,.4);transition:box-shadow .15s ease}
+  #cpu.inCB{background:linear-gradient(150deg,#fbbf24,#d97706 58%,#b45309);box-shadow:0 0 30px rgba(251,191,36,.7),0 0 80px rgba(251,191,36,.3),inset 0 1px 0 rgba(255,255,255,.4)}
+
+  /* 爪子 */
+  #hand{position:absolute;left:0;top:0;width:36px;height:52px;pointer-events:none;opacity:0;z-index:400;will-change:transform,opacity}
+  #hand .hand-arm{position:absolute;left:50%;top:0;width:8px;height:30px;margin-left:-4px;background:linear-gradient(180deg,#fde68a,#f59e0b);border-radius:4px;box-shadow:0 0 14px rgba(251,191,36,.85)}
+  #hand .claw-l,#hand .claw-r{position:absolute;top:26px;width:12px;height:24px;background:linear-gradient(180deg,#fbbf24,#d97706);box-shadow:0 0 14px rgba(251,191,36,.85);transition:transform .18s ease}
+  #hand .claw-l{left:0;border-radius:0 0 0 70%;transform:rotate(-25deg);transform-origin:top right}
+  #hand .claw-r{right:0;border-radius:0 0 70% 0;transform:rotate(25deg);transform-origin:top left}
+  #hand.grabbing .claw-l{transform:rotate(-6deg)}
+  #hand.grabbing .claw-r{transform:rotate(6deg)}
+
+  /* 飞行字节 */
+  .fly-byte{position:absolute;left:0;top:0;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:8px;font-family:ui-monospace,monospace;font-size:15px;font-weight:800;background:linear-gradient(145deg,#7dd3fc,#0ea5e9);color:#04202e;box-shadow:0 0 22px rgba(56,189,248,.9);z-index:450;pointer-events:none;will-change:transform,opacity}
+  .fly-byte.inDMA{background:linear-gradient(145deg,#d8b4fe,#a855f7);color:#1e0b30;box-shadow:0 0 24px rgba(168,85,247,1)}
+
+  /* 中断信号 */
+  #intSignal{position:absolute;left:0;top:0;width:70px;height:6px;background:linear-gradient(90deg,rgba(251,191,36,0),rgba(251,191,36,.95),rgba(251,191,36,0));border-radius:3px;filter:drop-shadow(0 0 12px rgba(251,191,36,.9));opacity:0;pointer-events:none;z-index:250;transform-origin:left center;will-change:transform,opacity}
+
+  /* 状态栏 */
+  #status{position:absolute;left:0;right:0;bottom:22px;text-align:center;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;color:#5d7ea6;letter-spacing:.4px;transition:color .3s;z-index:5}
+  #status.warn{color:#fda4af}
+  #status.dma{color:#c4a5f5;text-shadow:0 0 12px rgba(168,85,247,.5)}
+  #status.ok{color:#34d399}
+
+  #replay{position:absolute;right:18px;top:14px;z-index:999;padding:6px 15px;border-radius:9px;cursor:pointer;background:rgba(56,189,248,.09);border:1px solid rgba(56,189,248,.32);color:#7dd3fc;font-size:11.5px;font-family:inherit;letter-spacing:.5px;transition:all .2s}
+  #replay:hover{background:rgba(56,189,248,.22);color:#e0f2fe}
+  #replay:active{transform:scale(.94)}
+</style>
+</head>
+<body>
+<div id="viewport">
+  <div id="stage">
+    <div id="title">STM32 UART + DMA 接收</div>
+    <div id="subtitle">HAL_UART_Receive_DMA(&amp;huart2, rxBuffer, 4) + HAL_UART_RxCpltCallback</div>
+
+    <div id="pcPanel"   class="panel"></div>
+    <div id="rdrPanel"  class="panel"></div>
+    <div id="dmaPanel"  class="panel"></div>
+    <div id="bufPanel"  class="panel"></div>
+    <div id="loopPanel" class="panel"></div>
+    <div id="cbPanel"   class="panel"></div>
+
+    <div id="intSignal"></div>
+    <div id="cpu">CPU</div>
+    <div id="hand">
+      <div class="hand-arm"></div>
+      <div class="claw-l"></div>
+      <div class="claw-r"></div>
+    </div>
+
+    <div id="status">准备中…</div>
+    <button id="replay">▶ 重播</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  const stage = document.getElementById('stage');
+  const sleep = ms => new Promise(r => setTimeout(r, Math.max(30, ms)));
+  function mkIn(parent, tag, cls, styles){
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (styles) for (const k in styles){ try{ e.style[k] = styles[k]; }catch(_){} }
+    parent.appendChild(e);
+    return e;
+  }
+
+  const P = {
+    pc:   { x: 20,  y: 90, w: 200, h: 170 },
+    rdr:  { x: 240, y: 90, w: 160, h: 170 },
+    dma:  { x: 430, y: 90, w: 180, h: 170 },
+    buf:  { x: 640, y: 90, w: 340, h: 170 },
+    loop: { x: 20,  y: 300, w: 520, h: 380 },
+    cb:   { x: 560, y: 300, w: 620, h: 380 }
+  };
+
+  const CPU_SIZE = 44;
+  const LOOP_CPU_X  = 35;
+  const LOOP_LINE_Y = [354, 396, 438, 480, 522];
+  const CPU_CB = { x: 600, y: 438 };
+
+  const RDR_CX = P.rdr.x + P.rdr.w / 2;
+  const RDR_CY = P.rdr.y + 88;
+
+  const DMA_CX = P.dma.x + P.dma.w / 2;
+
+  const HAND_CLAW_OX = 18;
+  const HAND_CLAW_OY = 42;
+
+  const DATA = [
+    { ch: 'H', byte: 0x48 }, { ch: 'A', byte: 0x41 },
+    { ch: 'L', byte: 0x4C }, { ch: '!', byte: 0x21 }
+  ];
+
+  const panels = {
+    pc:   document.getElementById('pcPanel'),
+    rdr:  document.getElementById('rdrPanel'),
+    dma:  document.getElementById('dmaPanel'),
+    buf:  document.getElementById('bufPanel'),
+    loop: document.getElementById('loopPanel'),
+    cb:   document.getElementById('cbPanel')
+  };
+  for (const k in panels){
+    const b = P[k], p = panels[k];
+    p.style.left = b.x + 'px'; p.style.top = b.y + 'px';
+    p.style.width = b.w + 'px'; p.style.height = b.h + 'px';
+  }
+
+  /* PC */
+  mkIn(panels.pc, 'div', 'panel-head').textContent = 'PC · 发送方';
+  const pcMsg = mkIn(panels.pc, 'div', 'pc-msg');
+  pcMsg.textContent = '发送 4 个字节：';
+  const pcChars = DATA.map(function(d, i){
+    const c = mkIn(panels.pc, 'div', 'pc-char', {
+      left: (20 + i * 42) + 'px', top: '98px', width: '36px', height: '44px'
+    });
+    c.textContent = d.ch; return c;
+  });
+  function pcCharCenter(i){
+    return { x: P.pc.x + 20 + i * 42 + 18, y: P.pc.y + 98 + 22 };
+  }
+
+  /* RDR */
+  mkIn(panels.rdr, 'div', 'panel-head').textContent = 'RDR';
+  const rdrSlot = mkIn(panels.rdr, 'div', '', {
+    position:'absolute', left:'50%', top:'60px', transform:'translate(-50%,0)',
+    width:'80px', height:'56px', border:'2px dashed rgba(120,170,240,.22)',
+    borderRadius:'12px', background:'rgba(255,255,255,.012)', transition:'all .3s ease'
+  });
+  rdrSlot.id = 'rdrSlot';
+  const rxne = mkIn(panels.rdr, 'div', '', {
+    position:'absolute', left:'50%', top:'130px', transform:'translateX(-50%)',
+    display:'flex', alignItems:'center', gap:'6px',
+    fontFamily:'ui-monospace,monospace', fontSize:'10px', color:'#3d5678',
+    letterSpacing:'1px', transition:'color .25s'
+  });
+  rxne.id = 'rxne';
+  mkIn(rxne, 'div', '', {
+    width:'10px', height:'10px', borderRadius:'50%', background:'#28374a', transition:'all .25s'
+  });
+  const rxneText = document.createTextNode('RXNE = 0');
+  rxne.appendChild(rxneText);
+
+  /* DMA */
+  mkIn(panels.dma, 'div', 'panel-head').textContent = 'DMA · 直接内存访问';
+  mkIn(panels.dma, 'div', 'dma-port l');
+  mkIn(panels.dma, 'div', 'dma-port r');
+  mkIn(panels.dma, 'div', '', { id:'dmaBelt' });
+  const dmaProgress = mkIn(panels.dma, 'div', '', { id:'dmaProgress' });
+  const dmaDots = [0,1,2,3].map(function(){
+    return mkIn(dmaProgress, 'div', 'dma-dot');
+  });
+
+  /* rxBuffer */
+  mkIn(panels.buf, 'div', 'panel-head').textContent = '内存 · rxBuffer[4]';
+  const bufSlots = [0,1,2,3].map(function(i){
+    const s = mkIn(panels.buf, 'div', 'mem-slot', {
+      left: (i * 78 + 20) + 'px', top: '55px', width: '62px', height: '62px'
+    });
+    const v = mkIn(s, 'div', 'val'); v.textContent = '';
+    const idx = mkIn(s, 'div', 'idx'); idx.textContent = '[' + i + ']';
+    return s;
+  });
+
+  /* while loop */
+  const loopTag = mkIn(panels.loop, 'div', 'panel-tag');
+  loopTag.id = 'loopTag';
+  loopTag.textContent = 'MAIN LOOP';
+  mkIn(panels.loop, 'div', 'panel-head').textContent = '主循环 · while (1)';
+  const LOOP_LINES = [
+    '<span class="kw">while</span> (<span class="num">1</span>) {',
+    '    <span class="cmt">// CPU 完全不参与数据搬运</span>',
+    '    <span class="fn">HAL_GPIO_TogglePin</span>(<span class="macro">GPIOC</span>, <span class="macro">GPIO_PIN_15</span>);',
+    '    <span class="fn">HAL_Delay</span>(<span class="num">500</span>);',
+    '}'
+  ];
+  const loopLineEls = LOOP_LINES.map(function(html, i){
+    const d = mkIn(panels.loop, 'div', 'code-line', {
+      left: '60px', right: '20px', top: (60 + i * 42) + 'px', height: '32px'
+    });
+    d.innerHTML = html; return d;
+  });
+
+  /* callback —— 只有 3 行 */
+  const cbTag = mkIn(panels.cb, 'div', 'panel-tag');
+  cbTag.id = 'cbTag';
+  cbTag.textContent = 'INTERRUPT CALLBACK';
+  mkIn(panels.cb, 'div', 'panel-head').textContent = '回调 · HAL_UART_RxCpltCallback';
+  const CB_LINES = [
+    '<span class="kw">void</span>&nbsp;<span class="fn">uart2RxDMACallback</span>(UART_HandleTypeDef *huart) {',
+    '    <span class="cmt">// 4 字节已由 DMA 搬完，重新启动下一轮</span>',
+    '    <span class="fn">HAL_UART_Receive_DMA</span>(&amp;huart2, rxBuffer, <span class="num">4</span>);',
+    '}'
+  ];
+  const cbLineEls = CB_LINES.map(function(html, i){
+    const d = mkIn(panels.cb, 'div', 'code-line', {
+      left: '40px', right: '20px', top: (60 + i * 40) + 'px', height: '30px'
+    });
+    d.innerHTML = html; return d;
+  });
+
+  const cpu = document.getElementById('cpu');
+  const hand = document.getElementById('hand');
+  const intSignal = document.getElementById('intSignal');
+  const statusEl = document.getElementById('status');
+
+  let cpuPos = { x: LOOP_CPU_X, y: LOOP_LINE_Y[2] };
+  let handX = 0, handY = 0;
+  let cpuAttached = false;
+
+  function setCPU(x, y){
+    cpuPos.x = x; cpuPos.y = y;
+    cpu.style.transition = 'none';
+    cpu.style.transform = `translate(${x}px, ${y}px)`;
+    void cpu.offsetWidth;
+  }
+  function moveCPU(x, y, dur, ease){
+    dur = dur || 500;
+    ease = ease || 'cubic-bezier(.45,.05,.2,1)';
+    return new Promise(function(res){
+      cpu.style.transition = `transform ${dur}ms ${ease}, opacity .3s ease`;
+      void cpu.offsetWidth;
+      cpu.style.transform = `translate(${x}px, ${y}px)`;
+      cpuPos.x = x; cpuPos.y = y;
+      setTimeout(res, dur + 15);
+    });
+  }
+
+  function syncCpuToHand(){
+    const cx = handX + HAND_CLAW_OX - CPU_SIZE/2;
+    const cy = handY + HAND_CLAW_OY - CPU_SIZE/2;
+    cpu.style.transition = 'none';
+    cpu.style.transform = `translate(${cx}px, ${cy}px)`;
+    cpuPos.x = cx; cpuPos.y = cy;
+  }
+
+  function moveHandTo(targetX, targetY, dur, easeName){
+    dur = dur || 500;
+    easeName = easeName || 'easeOutCubic';
+    const startX = handX, startY = handY;
+    return new Promise(function(resolve){
+      const t0 = performance.now();
+      function ease(t){
+        if (easeName === 'easeOutHard') return 1 - Math.pow(1 - t, 4);
+        return 1 - Math.pow(1 - t, 3);
+      }
+      function tick(){
+        const t = Math.min((performance.now() - t0) / dur, 1);
+        const e = ease(t);
+        handX = startX + (targetX - startX) * e;
+        handY = startY + (targetY - startY) * e;
+        hand.style.transition = 'none';
+        hand.style.transform = `translate(${handX}px, ${handY}px)`;
+        if (cpuAttached) syncCpuToHand();
+        if (t < 1) requestAnimationFrame(tick);
+        else resolve();
+      }
+      requestAnimationFrame(tick);
+    });
+  }
+
+  async function handChaseAndGrabCPU(chaseDuration){
+    chaseDuration = chaseDuration || 620;
+    const startX = handX, startY = handY;
+    const t0 = performance.now();
+    return new Promise(function(resolve){
+      function tick(){
+        const t = Math.min((performance.now() - t0) / chaseDuration, 1);
+        const e = 1 - Math.pow(1 - t, 3);
+        const cpuCx = cpuPos.x + CPU_SIZE/2;
+        const cpuCy = cpuPos.y + CPU_SIZE/2;
+        const tgtHandX = cpuCx - HAND_CLAW_OX;
+        const tgtHandY = cpuCy - HAND_CLAW_OY;
+        handX = startX + (tgtHandX - startX) * e;
+        handY = startY + (tgtHandY - startY) * e;
+        hand.style.transition = 'none';
+        hand.style.transform = `translate(${handX}px, ${handY}px)`;
+        if (t < 1) requestAnimationFrame(tick);
+        else {
+          handX = cpuPos.x + CPU_SIZE/2 - HAND_CLAW_OX;
+          handY = cpuPos.y + CPU_SIZE/2 - HAND_CLAW_OY;
+          hand.style.transform = `translate(${handX}px, ${handY}px)`;
+          resolve();
+        }
+      }
+      requestAnimationFrame(tick);
+    });
+  }
+
+  async function handAppearFromCallback(){
+    const cbLeft = P.cb.x + 20;
+    const cbTop = P.cb.y + 40;
+    handX = cbLeft;
+    handY = cbTop - HAND_CLAW_OY;
+
+    hand.classList.remove('grabbing');
+    hand.style.transition = 'none';
+    hand.style.opacity = '0';
+    hand.style.transform = `translate(${handX}px, ${handY}px) scale(0.4)`;
+    void hand.offsetWidth;
+
+    hand.style.transition = 'opacity .25s, transform .35s cubic-bezier(.34,1.56,.64,1)';
+    hand.style.opacity = '1';
+    hand.style.transform = `translate(${handX}px, ${handY}px) scale(1)`;
+    await sleep(380);
+  }
+
+  async function cpuStruggle(){
+    cpu.classList.add('grabbed');
+    const bx = handX, by = handY;
+    const seq = [8,-8,6,-6,4,-4,2,-2,0];
+    const delay = [45,45,40,40,38,38,35,35,30];
+    for (let i = 0; i < seq.length; i++){
+      handX = bx + seq[i]; handY = by;
+      hand.style.transition = 'none';
+      hand.style.transform = `translate(${handX}px, ${handY}px)`;
+      syncCpuToHand();
+      await sleep(delay[i]);
+    }
+    handX = bx; handY = by;
+    hand.style.transform = `translate(${bx}px, ${by}px)`;
+    syncCpuToHand();
+    cpu.classList.remove('grabbed');
+  }
+
+  async function handCarryCPUToCpuPos(targetCpuX, targetCpuY, dur){
+    const targetHandX = targetCpuX + CPU_SIZE/2 - HAND_CLAW_OX;
+    const targetHandY = targetCpuY + CPU_SIZE/2 - HAND_CLAW_OY;
+    await moveHandTo(targetHandX, targetHandY, dur || 620, 'easeOutHard');
+  }
+
+  async function handReleaseAndHide(){
+    cpuAttached = false;
+    hand.classList.remove('grabbing');
+    await sleep(140);
+    await moveHandTo(handX + 6, handY - 60, 340, 'easeOutCubic');
+    hand.style.transition = 'opacity .3s ease';
+    hand.style.opacity = '0';
+    await sleep(320);
+  }
+
+  async function fireIntSignal(fromX, fromY, toX, toY, dur){
+    dur = dur || 260;
+    const dx = toX - fromX, dy = toY - fromY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    intSignal.style.transition = 'none';
+    intSignal.style.transformOrigin = 'left center';
+    intSignal.style.transform =
+      `translate(${fromX}px, ${fromY - 3}px) rotate(${angle}deg) scaleX(${dist / 70})`;
+    intSignal.style.opacity = '1';
+    void intSignal.offsetWidth;
+    intSignal.style.transition = `opacity ${dur}ms ease`;
+    intSignal.style.opacity = '0';
+    await sleep(dur);
+  }
+
+  function highlightLoop(i){
+    loopLineEls.forEach(l => l.classList.remove('running','active','interrupt','dmaHighlight'));
+    if (i >= 0) loopLineEls[i].classList.add('running');
+  }
+  function interruptLoop(i){
+    loopLineEls.forEach(l => l.classList.remove('running','active','interrupt','dmaHighlight'));
+    if (i >= 0) loopLineEls[i].classList.add('interrupt');
+  }
+  function highlightCB(i, cls){
+    cbLineEls.forEach(l => l.classList.remove('active','done','dmaHighlight'));
+    if (i !== undefined && cls) cbLineEls[i].classList.add(cls);
+  }
+
+  let loopToken = null;
+  let loopPromise = null;
+  let currentLoopLine = 2;
+  function runWhileLoop(){
+    const myToken = {};
+    loopToken = myToken;
+    loopPromise = (async function(){
+      while (loopToken === myToken){
+        if (loopToken !== myToken) return;
+        currentLoopLine = 2; highlightLoop(2);
+        await moveCPU(LOOP_CPU_X, LOOP_LINE_Y[2], 380);
+        if (loopToken !== myToken) return;
+        await sleep(420);
+        if (loopToken !== myToken) return;
+        currentLoopLine = 3; highlightLoop(3);
+        await moveCPU(LOOP_CPU_X, LOOP_LINE_Y[3], 380);
+        if (loopToken !== myToken) return;
+        await sleep(420);
+        if (loopToken !== myToken) return;
+        currentLoopLine = 0; highlightLoop(0);
+        await moveCPU(LOOP_CPU_X, LOOP_LINE_Y[0], 380);
+        if (loopToken !== myToken) return;
+        await sleep(240);
+      }
+    })();
+  }
+  async function stopWhileLoop(){
+    loopToken = null;
+    if (loopPromise){
+      await loopPromise;
+      loopPromise = null;
+    }
+  }
+
+  async function flyByteIntoRDR(ch, fromX, fromY){
+    const fly = mkIn(stage, 'div', 'fly-byte');
+    fly.textContent = ch;
+    fly.style.transition = 'none';
+    fly.style.transform = `translate(${fromX - 15}px, ${fromY - 15}px) scale(1)`;
+    fly.style.opacity = '1';
+    void fly.offsetWidth;
+    fly.style.transition = 'transform .55s cubic-bezier(.4,0,.3,1)';
+    fly.style.transform = `translate(${RDR_CX - 15}px, ${RDR_CY - 15}px) scale(1)`;
+    await sleep(580);
+    return fly;
+  }
+
+  async function flyByteThroughDMA(byteEl, ch, slotIdx){
+    const dmLeft  = P.dma.x + 6;
+    const dmRight = P.dma.x + P.dma.w - 6;
+    const beltY   = P.dma.y + 70;
+
+    byteEl.classList.add('inDMA');
+    byteEl.style.transition = 'transform .45s cubic-bezier(.4,0,.3,1)';
+    byteEl.style.transform =
+      `translate(${dmLeft - 15}px, ${beltY - 15}px) scale(1)`;
+    await sleep(470);
+
+    byteEl.style.transition = 'transform .65s linear';
+    byteEl.style.transform =
+      `translate(${dmRight - 15}px, ${beltY - 15}px) scale(1)`;
+    await sleep(670);
+
+    const slotCx = P.buf.x + 20 + slotIdx * 78 + 31;
+    const slotCy = P.buf.y + 55 + 31;
+
+    byteEl.style.transition = 'transform .5s cubic-bezier(.4,0,.3,1)';
+    byteEl.style.transform =
+      `translate(${slotCx - 15}px, ${slotCy - 15}px) scale(0.6)`;
+    byteEl.style.opacity = '0';
+    await sleep(520);
+
+    if (byteEl.parentNode) byteEl.parentNode.removeChild(byteEl);
+
+    bufSlots[slotIdx].querySelector('.val').textContent = ch;
+    bufSlots[slotIdx].classList.add('filled');
+    dmaDots[slotIdx].classList.add('filled');
+  }
+
+  function resetAll(){
+    loopToken = null;
+    loopPromise = null;
+    cpuAttached = false;
+    document.querySelectorAll('.fly-byte').forEach(e => e.remove());
+
+    for (const k in panels) panels[k].classList.remove('on');
+    panels.dma.classList.remove('active');
+    loopTag.classList.remove('show');
+    cbTag.classList.remove('show');
+
+    pcChars.forEach(c => c.classList.remove('sending','done'));
+    rdrSlot.classList.remove('has','emptied');
+    rxne.classList.remove('on','pulse');
+    rxneText.nodeValue = 'RXNE = 0';
+    dmaDots.forEach(d => d.classList.remove('filled'));
+    bufSlots.forEach(s => {
+      s.classList.remove('filled');
+      s.querySelector('.val').textContent = '';
+    });
+    loopLineEls.forEach(l => l.classList.remove('running','active','interrupt','dmaHighlight'));
+    cbLineEls.forEach(l => l.classList.remove('active','done','dmaHighlight'));
+
+    cpu.classList.remove('visible','inCB','grabbed');
+    while (cpu.firstChild) cpu.removeChild(cpu.firstChild);
+    cpu.textContent = 'CPU';
+    setCPU(LOOP_CPU_X, LOOP_LINE_Y[2]);
+
+    hand.style.opacity = '0';
+    hand.classList.remove('grabbing');
+    handX = LOOP_CPU_X + CPU_SIZE/2 - HAND_CLAW_OX;
+    handY = LOOP_LINE_Y[2] + CPU_SIZE/2 - HAND_CLAW_OY;
+    hand.style.transition = 'none';
+    hand.style.transform = `translate(${handX}px, ${handY}px)`;
+
+    intSignal.style.opacity = '0';
+    statusEl.textContent = '准备中…';
+    statusEl.classList.remove('warn','ok','dma');
+  }
+
+  async function sceneSetup(){
+    panels.pc.classList.add('on');
+    panels.loop.classList.add('on');
+    panels.cb.classList.add('on');
+    panels.rdr.classList.add('on');
+    panels.dma.classList.add('on');
+    panels.buf.classList.add('on');
+    loopTag.classList.add('show');
+    cbTag.classList.add('show');
+
+    statusEl.textContent = 'MCU 启动：注册回调 + 用 DMA 启动 UART 接收';
+    await sleep(900);
+
+    highlightCB(2, 'dmaHighlight');
+    await sleep(900);
+    highlightCB(-1);
+    await sleep(300);
+
+    cpu.classList.add('visible');
+    setCPU(LOOP_CPU_X, LOOP_LINE_Y[2]);
+    statusEl.textContent = 'CPU 进入 while(1) 循环，完全不参与数据搬运';
+    runWhileLoop();
+    await sleep(1400);
+
+    statusEl.textContent = 'DMA 已经在后台等待数据…';
+    statusEl.classList.add('dma');
+    await sleep(800);
+  }
+
+  async function sceneInterrupt(idx){
+    const d = DATA[idx];
+
+    pcChars[idx].classList.add('sending');
+    statusEl.textContent = 'PC 发送第 ' + (idx+1) + ' 字节「' + d.ch + '」…';
+    await sleep(340);
+
+    const src = pcCharCenter(idx);
+    const flyByte = await flyByteIntoRDR(d.ch, src.x, src.y);
+    rdrSlot.classList.add('has');
+    rdrSlot.classList.remove('emptied');
+    rxne.classList.add('on');
+    rxne.classList.add('pulse');
+    rxneText.nodeValue = 'RXNE = 1';
+    setTimeout(() => rxne.classList.remove('pulse'), 550);
+    pcChars[idx].classList.remove('sending');
+    pcChars[idx].classList.add('done');
+
+    panels.dma.classList.add('active');
+    statusEl.textContent = '⚡ DMA 检测到 RXNE → 自动搬运（CPU 仍在跑 while）';
+    statusEl.classList.remove('warn');
+    statusEl.classList.add('dma');
+
+    await sleep(400);
+
+    rdrSlot.classList.remove('has');
+    rdrSlot.classList.add('emptied');
+    rxne.classList.remove('on');
+    rxneText.nodeValue = 'RXNE = 0';
+
+    await flyByteThroughDMA(flyByte, d.ch, idx);
+
+    panels.dma.classList.remove('active');
+    statusEl.textContent = '✓ 字节「' + d.ch + '」已由 DMA 存入 rxBuffer[' + idx + ']';
+    statusEl.classList.remove('dma');
+    statusEl.classList.add('ok');
+    await sleep(500);
+
+    statusEl.textContent = '⚙ CPU 全程未参与搬运，仍在 while(1) 里运行…';
+    await sleep(700);
+
+    if (idx === 3){
+      statusEl.textContent = '⚠ DMA 搬满 4 字节 → 硬件触发中断 → CPU 被打断！';
+      statusEl.classList.remove('ok');
+      statusEl.classList.add('warn');
+
+      await fireIntSignal(
+        DMA_CX, P.dma.y + P.dma.h,
+        cpuPos.x + CPU_SIZE/2, cpuPos.y + CPU_SIZE/2,
+        300
+      );
+
+      await handAppearFromCallback();
+
+      statusEl.textContent = '⚡ 爪子追向正在运行的 CPU…';
+      await sleep(120);
+
+      setTimeout(() => { loopToken = null; }, 220);
+
+      await handChaseAndGrabCPU(620);
+      hand.classList.add('grabbing');
+      await sleep(140);
+
+      if (loopPromise){
+        await loopPromise;
+        loopPromise = null;
+      }
+
+      handX = cpuPos.x + CPU_SIZE/2 - HAND_CLAW_OX;
+      handY = cpuPos.y + CPU_SIZE/2 - HAND_CLAW_OY;
+      hand.style.transition = 'none';
+      hand.style.transform = `translate(${handX}px, ${handY}px)`;
+      cpuAttached = true;
+      syncCpuToHand();
+
+      interruptLoop(currentLoopLine);
+
+      statusEl.textContent = '⚡ CPU 被打断 → 正在挣扎…';
+      await sleep(160);
+      await cpuStruggle();
+      await sleep(60);
+
+      statusEl.textContent = '⚡ 爪子把 CPU 拖向 RxCpltCallback';
+      await handCarryCPUToCpuPos(CPU_CB.x, CPU_CB.y, 680);
+      await sleep(120);
+
+      await handReleaseAndHide();
+
+      cpu.classList.add('inCB');
+      await sleep(220);
+
+      highlightCB(2, 'active');
+      statusEl.textContent = '执行回调：HAL_UART_Receive_DMA() —— 重新启动下一轮';
+      await sleep(900);
+
+      highlightCB(2, 'done');
+      panels.dma.classList.add('active');
+      await sleep(500);
+      panels.dma.classList.remove('active');
+      cpu.classList.remove('inCB');
+      statusEl.classList.add('dma');
+      statusEl.textContent = 'DMA 已重新装载，等待下一批数据…';
+      await sleep(600);
+
+      handX = CPU_CB.x + CPU_SIZE/2 - HAND_CLAW_OX;
+      handY = CPU_CB.y - 60 - HAND_CLAW_OY;
+      hand.classList.remove('grabbing');
+      hand.style.transition = 'none';
+      hand.style.opacity = '0';
+      hand.style.transform = `translate(${handX}px, ${handY}px) scale(0.6)`;
+      void hand.offsetWidth;
+      hand.style.transition = 'opacity .25s, transform .3s cubic-bezier(.34,1.56,.64,1)';
+      hand.style.opacity = '1';
+      hand.style.transform = `translate(${handX}px, ${handY}px) scale(1)`;
+      await sleep(340);
+
+      await moveHandTo(
+        CPU_CB.x + CPU_SIZE/2 - HAND_CLAW_OX,
+        CPU_CB.y + CPU_SIZE/2 - HAND_CLAW_OY,
+        280, 'easeOutHard'
+      );
+      hand.classList.add('grabbing');
+      await sleep(120);
+      cpuAttached = true;
+      syncCpuToHand();
+
+      await handCarryCPUToCpuPos(LOOP_CPU_X, LOOP_LINE_Y[2], 700);
+      await handReleaseAndHide();
+
+      statusEl.classList.remove('dma','warn');
+      statusEl.classList.add('ok');
+      statusEl.textContent = 'CPU 回到 while(1) 继续执行…';
+      await sleep(400);
+
+      runWhileLoop();
+      await sleep(600);
+    }
+  }
+
+  let running = false;
+  async function run(){
+    if (running) return;
+    running = true;
+    try {
+      resetAll();
+      await sleep(500);
+
+      await sceneSetup();
+
+      for (let i = 0; i < 4; i++){
+        await sceneInterrupt(i);
+        if (i < 3) await sleep(280);
+      }
+
+      await stopWhileLoop();
+      statusEl.textContent = '✓ 4 字节全部由 DMA 搬运完成 · CPU 全程专注 while 循环';
+      statusEl.classList.remove('dma','warn');
+      statusEl.classList.add('ok');
+
+    } catch(err){
+      console.error(err);
+      statusEl.textContent = '出错：' + err.message;
+    }
+    running = false;
+  }
+
+  function fit(){
+    let s = Math.min(window.innerWidth / 1240, window.innerHeight / 760, 1.3);
+    if (s < 0.3) s = 0.3;
+    stage.style.transform = 'scale(' + s + ')';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  document.getElementById('replay').addEventListener('click', () => {
+    if (running) return;
+    run();
+  });
+  setTimeout(run, 700);
+})();
+</script>
+</body>
+</html>

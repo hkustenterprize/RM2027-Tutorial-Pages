@@ -27,10 +27,47 @@
 | Tutorial 0：C++ Tutorial | [Google Drive](https://drive.google.com/drive/folders/1hbmdChpYoPN75QKTG9d-vQLtOlBAbcfT?usp=drive_link) |
 | Tutorial 1：Introduction to Embedded System | [Google Drive](https://drive.google.com/drive/folders/12UpMeoHU_ZNJ9v3CEk3bbNuVo3BYgGuR?usp=drive_link) |
 | Tutorial 2：Communication Protocols & UART | [查看讲义](<CourseMaterials/T2/Embedded Tutorial 2 - 通信协议 UART.md>)<br>[补充资料](CourseMaterials/T2/supplementary-reading.md) |
-| Tutorial 3：Interrupt & DMA (UART Receive) | [查看讲义](<CourseMaterials/T3/Embedded Tutorial 3 - UART接收 中断与DMA.md>) |
+| Tutorial 3：Interrupt & DMA (UART Receive) | [查看讲义](<CourseMaterials/T3/Embedded Tutorial 3 - UART接收 中断与DMA.md>)<br>[交互式 Demo](#tutorial3-demo) |
 | Tutorial 4：CAN Communication | [查看课件](<CourseMaterials/T4/Embedded Tutorial 4 - CAN Communication.pdf>) |
 | Tutorial 5：Control & PID | [Google Drive](https://drive.google.com/drive/folders/1IYNPPKZhDktt1x0LAvl82ve-gzqShWJt?usp=drive_link) |
 | Tutorial 6：Clock & Timer & PWM | [Google Drive](https://drive.google.com/drive/folders/10qTFk3EfvK6kUb6KxoNQUj0eGSXcNe_9?usp=drive_link) |
+
+<details id="tutorial3-demo">
+<summary>交互式 Demo</summary>
+
+下面的动画可以直接在网站中播放，帮助理解 UART 接收、中断和 DMA 的工作过程。
+
+<style>
+.tutorial3-demo {
+  width: 100%;
+  height: 760px;
+  border: 0;
+  border-radius: 12px;
+  background: #02040a;
+}
+</style>
+
+#### UART 接收过程
+
+<iframe class="tutorial3-demo" src="CourseMaterials/T3/interactive-demo/uart_receive.html" title="STM32 UART 接收过程" loading="lazy"></iframe>
+
+#### UART + DMA 接收
+
+<iframe class="tutorial3-demo" src="CourseMaterials/T3/interactive-demo/uart_receive_DMA.html" title="STM32 UART + DMA 接收" loading="lazy"></iframe>
+
+#### UART 中断接收
+
+<iframe class="tutorial3-demo" src="CourseMaterials/T3/interactive-demo/uart_receive_it.html" title="STM32 UART 中断接收" loading="lazy"></iframe>
+
+#### UART 接收超时
+
+<iframe class="tutorial3-demo" src="CourseMaterials/T3/interactive-demo/uart_receive_timeout.html" title="STM32 UART 接收超时" loading="lazy"></iframe>
+
+#### UART 按位解码
+
+<iframe class="tutorial3-demo" src="CourseMaterials/T3/interactive-demo/uart_decode_by_bit.html" title="UART 按位解码" loading="lazy"></iframe>
+
+</details>
 
 ## 作业
 

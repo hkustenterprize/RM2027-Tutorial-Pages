@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>STM32 UART 中断接收</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#02040a;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
+  #viewport{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  #stage{position:relative;width:1200px;height:720px;flex:none;background:radial-gradient(circle at 18% 8%,#0c1728 0%,#060b16 58%,#02040a 100%);border:1px solid rgba(120,180,255,.08);border-radius:24px;overflow:hidden;transform-origin:center center;box-shadow:0 40px 100px rgba(0,0,0,.8)}
+  #title{position:absolute;top:14px;left:0;right:0;text-align:center;font-size:17px;font-weight:700;letter-spacing:3px;color:#c9e0ff;text-shadow:0 0 26px rgba(56,189,248,.3);z-index:5}
+  #subtitle{position:absolute;top:38px;left:0;right:0;text-align:center;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;color:#33506f;letter-spacing:.3px;z-index:5}
+  #subtitle b{color:#38bdf8;font-weight:600}
+  .panel{position:absolute;background:rgba(255,255,255,.024);border:1px solid rgba(120,170,240,.14);border-radius:18px;opacity:0;transition:opacity .55s ease, box-shadow .4s ease, border-color .4s ease;box-shadow:0 14px 40px rgba(0,0,0,.45)}
+  .panel.on{opacity:1}
+  .panel-head{position:absolute;left:16px;top:11px;font-size:11px;font-weight:600;letter-spacing:1.2px;color:#6d93bd;white-space:nowrap}
+  #pcPanel .pc-msg{position:absolute;left:16px;top:36px;right:16px;font-size:12px;color:#a7c9ec;letter-spacing:.4px;font-family:ui-monospace,"PingFang SC",monospace}
+  .pc-char{position:absolute;display:flex;align-items:center;justify-content:center;border-radius:10px;border:2px solid rgba(120,170,240,.22);background:rgba(255,255,255,.025);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:24px;font-weight:800;color:#54759c;transition:all .3s ease}
+  .pc-char.sending{border-color:#38bdf8;background:rgba(56,189,248,.22);color:#dbeafe;box-shadow:0 0 26px rgba(56,189,248,.7);transform:translateY(-4px) scale(1.1)}
+  .pc-char.done{border-color:rgba(52,211,153,.55);background:rgba(52,211,153,.09);color:#6ee7b7}
+  #rdrSlot{position:absolute;left:50%;top:50px;transform:translate(-50%,0);width:90px;height:60px;border:2px dashed rgba(120,170,240,.22);border-radius:12px;background:rgba(255,255,255,.012);transition:all .3s ease}
+  #rdrSlot.has{border-style:solid;border-color:#fbbf24;background:rgba(251,191,36,.08);box-shadow:0 0 26px rgba(251,191,36,.45),inset 0 0 18px rgba(251,191,36,.08)}
+  #rxne{position:absolute;display:flex;align-items:center;gap:7px;font-family:ui-monospace,monospace;font-size:11px;color:#3d5678;letter-spacing:1.2px;transition:color .25s}
+  #rxne .led{width:11px;height:11px;border-radius:50%;background:#28374a;transition:all .25s}
+  #rxne.on{color:#fb7185}
+  #rxne.on .led{background:#f43f5e;box-shadow:0 0 14px #f43f5e,0 0 28px rgba(244,63,94,.55)}
+  #rxne.pulse .led{animation:ledPulse .55s ease}
+  @keyframes ledPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.7)}}
+  #intSignal{position:absolute;left:0;top:0;width:70px;height:6px;background:linear-gradient(90deg,rgba(251,191,36,0),rgba(251,191,36,.95),rgba(251,191,36,0));border-radius:3px;filter:drop-shadow(0 0 12px rgba(251,191,36,.9));opacity:0;pointer-events:none;z-index:250;transform-origin:left center;will-change:transform,opacity}
+  .mem-slot{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:ui-monospace,Menlo,Consolas,monospace;border:2px dashed rgba(120,170,240,.2);border-radius:12px;background:rgba(255,255,255,.016);transition:all .4s ease}
+  .mem-slot .val{font-size:22px;font-weight:800;line-height:1;color:transparent;transition:color .35s}
+  .mem-slot .idx{font-size:9px;color:#3d5a7d;margin-top:4px;letter-spacing:.5px}
+  .mem-slot.filled{border-style:solid;border-color:#38bdf8;background:rgba(56,189,248,.15);box-shadow:0 0 26px rgba(56,189,248,.4),inset 0 0 14px rgba(56,189,248,.1)}
+  .mem-slot.filled .val{color:#bae6fd}
+  .mem-slot.filled .idx{color:#7dd3fc}
+  .code-line{position:absolute;display:flex;align-items:center;padding:0 12px;border-radius:8px;font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:12.5px;line-height:1;white-space:pre;color:#7f9cbe;transition:background .3s,box-shadow .3s,color .3s}
+  .code-line.running{background:rgba(56,189,248,.10);box-shadow:inset 0 0 0 1px rgba(56,189,248,.28),0 0 24px rgba(56,189,248,.10);color:#c9e4ff;animation:runPulse 2s ease-in-out infinite}
+  @keyframes runPulse{0%,100%{box-shadow:inset 0 0 0 1px rgba(56,189,248,.28),0 0 20px rgba(56,189,248,.08)}50%{box-shadow:inset 0 0 0 1px rgba(56,189,248,.5),0 0 32px rgba(56,189,248,.22)}}
+  .code-line.interrupt{background:rgba(244,63,94,.18);box-shadow:inset 0 0 0 1px rgba(244,63,94,.6),0 0 30px rgba(244,63,94,.25);color:#fecdd3;animation:interruptFlash .5s ease}
+  @keyframes interruptFlash{0%{background:rgba(244,63,94,.05)}40%{background:rgba(244,63,94,.4)}100%{background:rgba(244,63,94,.18)}}
+  .code-line.active{background:rgba(56,189,248,.16);box-shadow:inset 0 0 0 1px rgba(56,189,248,.45),0 0 26px rgba(56,189,248,.15);color:#e0f2fe}
+  .code-line.done{background:rgba(52,211,153,.12);box-shadow:inset 0 0 0 1px rgba(52,211,153,.32);color:#a7f3d0}
+  .kw{color:#c084fc}.fn{color:#fbbf24}.num{color:#f472b6}.cmt{color:#3d5673;font-style:italic}.var{color:#7dd3fc}.macro{color:#fda4af}
+  .panel-tag{position:absolute;right:14px;top:10px;font-family:ui-monospace,monospace;font-size:9.5px;font-weight:700;letter-spacing:1.5px;padding:3px 9px;border-radius:20px;opacity:0;transition:opacity .3s}
+  .panel-tag.show{opacity:1}
+  #loopTag{color:#7dd3fc;border:1px solid rgba(56,189,248,.4);background:rgba(56,189,248,.08)}
+  #cbTag{color:#fbbf24;border:1px solid rgba(251,191,36,.5);background:rgba(251,191,36,.1)}
+  #cpu{position:absolute;left:0;top:0;width:44px;height:44px;border-radius:11px;background:linear-gradient(150deg,#6cabff,#2563eb 58%,#1d4ed8);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;letter-spacing:.9px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.45);box-shadow:0 0 26px rgba(59,130,246,.6),0 0 70px rgba(59,130,246,.2),inset 0 1px 0 rgba(255,255,255,.4);z-index:300;opacity:0;transition:opacity .45s ease;will-change:transform}
+  #cpu.visible{opacity:1}
+  #cpu.grabbed{box-shadow:0 0 50px rgba(251,191,36,1),0 0 100px rgba(251,191,36,.6),inset 0 1px 0 rgba(255,255,255,.4);transition:box-shadow .15s ease}
+  #cpu.inCB{background:linear-gradient(150deg,#fbbf24,#d97706 58%,#b45309);box-shadow:0 0 30px rgba(251,191,36,.7),0 0 80px rgba(251,191,36,.3),inset 0 1px 0 rgba(255,255,255,.4)}
+  .cpu-badge{position:absolute;right:-13px;top:-13px;width:26px;height:26px;border-radius:8px;background:linear-gradient(145deg,#7dd3fc,#0ea5e9);color:#03202e;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace;box-shadow:0 0 18px rgba(56,189,248,.9);transform:scale(0);transition:transform .25s cubic-bezier(.34,1.56,.64,1);pointer-events:none;z-index:5}
+  .cpu-badge.show{transform:scale(1)}
+  #hand{position:absolute;left:0;top:0;width:36px;height:52px;pointer-events:none;opacity:0;z-index:400;will-change:transform,opacity}
+  #hand .hand-arm{position:absolute;left:50%;top:0;width:8px;height:30px;margin-left:-4px;background:linear-gradient(180deg,#fde68a,#f59e0b);border-radius:4px;box-shadow:0 0 14px rgba(251,191,36,.85)}
+  #hand .claw-l,#hand .claw-r{position:absolute;top:26px;width:12px;height:24px;background:linear-gradient(180deg,#fbbf24,#d97706);box-shadow:0 0 14px rgba(251,191,36,.85);transition:transform .18s ease}
+  #hand .claw-l{left:0;border-radius:0 0 0 70%;transform:rotate(-25deg);transform-origin:top right}
+  #hand .claw-r{right:0;border-radius:0 0 70% 0;transform:rotate(25deg);transform-origin:top left}
+  #hand.grabbing .claw-l{transform:rotate(-6deg)}
+  #hand.grabbing .claw-r{transform:rotate(6deg)}
+  .fly-byte{position:absolute;left:0;top:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:8px;font-family:ui-monospace,monospace;font-size:16px;font-weight:800;background:linear-gradient(145deg,#7dd3fc,#0ea5e9);color:#04202e;box-shadow:0 0 22px rgba(56,189,248,.9);z-index:450;pointer-events:none;will-change:transform,opacity}
+  #status{position:absolute;left:0;right:0;bottom:22px;text-align:center;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;color:#5d7ea6;letter-spacing:.4px;transition:color .3s;z-index:5}
+  #status.warn{color:#fda4af}
+  #status.ok{color:#34d399}
+  #replay{position:absolute;right:18px;top:14px;z-index:999;padding:6px 15px;border-radius:9px;cursor:pointer;background:rgba(56,189,248,.09);border:1px solid rgba(56,189,248,.32);color:#7dd3fc;font-size:11.5px;font-family:inherit;letter-spacing:.5px;transition:all .2s}
+  #replay:hover{background:rgba(56,189,248,.22);color:#e0f2fe}
+  #replay:active{transform:scale(.94)}
+</style>
+</head>
+<body>
+<div id="viewport">
+  <div id="stage">
+    <div id="title">STM32 UART 中断接收</div>
+    <div id="subtitle">HAL_UART_Receive_IT(&amp;huart2, rxBuffer, 4) + HAL_UART_RxCpltCallback</div>
+    <div id="pcPanel"   class="panel"></div>
+    <div id="rdrPanel"  class="panel"></div>
+    <div id="bufPanel"  class="panel"></div>
+    <div id="loopPanel" class="panel"></div>
+    <div id="cbPanel"   class="panel"></div>
+    <div id="intSignal"></div>
+    <div id="cpu">CPU</div>
+    <div id="hand">
+      <div class="hand-arm"></div>
+      <div class="claw-l"></div>
+      <div class="claw-r"></div>
+    </div>
+    <div id="status">准备中…</div>
+    <button id="replay">▶ 重播</button>
+  </div>
+</div>
+<script>
+(function(){
+  'use strict';
+  const stage = document.getElementById('stage');
+  const sleep = ms => new Promise(r => setTimeout(r, Math.max(30, ms)));
+  function mkIn(parent, tag, cls, styles){
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (styles) for (const k in styles){ try{ e.style[k] = styles[k]; }catch(_){} }
+    parent.appendChild(e);
+    return e;
+  }
+
+  const P = {
+    pc:   { x: 20,  y: 90,  w: 220, h: 180 },
+    rdr:  { x: 260, y: 90,  w: 240, h: 180 },
+    buf:  { x: 620, y: 90,  w: 300, h: 180 },
+    loop: { x: 20,  y: 320, w: 500, h: 370 },
+    cb:   { x: 540, y: 320, w: 640, h: 370 }
+  };
+  const CPU_SIZE = 44;
+  const LOOP_CPU_X  = 35;
+  const LOOP_LINE_Y = [374, 416, 458];
+  const CPU_RDR = { x: 358, y: 290 };
+  const CPU_CB  = { x: 580, y: 458 };
+  const RDR_CX = P.rdr.x + P.rdr.w / 2;
+  const RDR_CY = P.rdr.y + 80;
+  const HAND_CLAW_OX = 18;
+  const HAND_CLAW_OY = 42;
+  const DATA = [
+    { ch: 'H', byte: 0x48 }, { ch: 'A', byte: 0x41 },
+    { ch: 'L', byte: 0x4C }, { ch: '!', byte: 0x21 }
+  ];
+
+  const panels = {
+    pc:   document.getElementById('pcPanel'),
+    rdr:  document.getElementById('rdrPanel'),
+    buf:  document.getElementById('bufPanel'),
+    loop: document.getElementById('loopPanel'),
+    cb:   document.getElementById('cbPanel')
+  };
+  for (const k in panels){
+    const b = P[k], p = panels[k];
+    p.style.left = b.x + 'px'; p.style.top = b.y + 'px';
+    p.style.width = b.w + 'px'; p.style.height = b.h + 'px';
+  }
+
+  /* PC */
+  mkIn(panels.pc, 'div', 'panel-head').textContent = 'PC · 发送方';
+  const pcMsg = mkIn(panels.pc, 'div', 'pc-msg');
+  pcMsg.textContent = '发送 4 个字节：';
+  const pcChars = DATA.map(function(d, i){
+    const c = mkIn(panels.pc, 'div', 'pc-char', {
+      left: (20 + i * 48) + 'px', top: '100px', width: '40px', height: '48px'
+    });
+    c.textContent = d.ch; return c;
+  });
+  function pcCharCenter(i){
+    return { x: P.pc.x + 20 + i * 48 + 20, y: P.pc.y + 100 + 24 };
+  }
+
+  /* RDR */
+  mkIn(panels.rdr, 'div', 'panel-head').textContent = '接收数据寄存器 · RDR';
+  const rdrSlot = mkIn(panels.rdr, 'div', '', {
+    position:'absolute', left:'50%', top:'50px', transform:'translate(-50%,0)',
+    width:'90px', height:'60px', border:'2px dashed rgba(120,170,240,.22)',
+    borderRadius:'12px', background:'rgba(255,255,255,.012)', transition:'all .3s ease'
+  });
+  rdrSlot.id = 'rdrSlot';
+  const rxne = mkIn(panels.rdr, 'div', '', {
+    position:'absolute', left:'50%', top:'128px', transform:'translateX(-50%)',
+    display:'flex', alignItems:'center', gap:'7px',
+    fontFamily:'ui-monospace,monospace', fontSize:'11px', color:'#3d5678',
+    letterSpacing:'1.2px', transition:'color .25s'
+  });
+  rxne.id = 'rxne';
+  mkIn(rxne, 'div', '', {
+    width:'11px', height:'11px', borderRadius:'50%', background:'#28374a', transition:'all .25s'
+  });
+  const rxneText = document.createTextNode('RXNE = 0');
+  rxne.appendChild(rxneText);
+
+  /* rxBuffer */
+  mkIn(panels.buf, 'div', 'panel-head').textContent = '内存 · rxBuffer[4]';
+  const bufSlots = [0,1,2,3].map(function(i){
+    const s = mkIn(panels.buf, 'div', 'mem-slot', {
+      left: (i * 75 + 10) + 'px', top: '55px', width: '60px', height: '60px'
+    });
+    const v = mkIn(s, 'div', 'val'); v.textContent = '';
+    const idx = mkIn(s, 'div', 'idx'); idx.textContent = '[' + i + ']';
+    return s;
+  });
+
+  /* while loop */
+  const loopTag = mkIn(panels.loop, 'div', 'panel-tag');
+  loopTag.id = 'loopTag';
+  loopTag.textContent = 'MAIN LOOP';
+  mkIn(panels.loop, 'div', 'panel-head').textContent = '主循环 · while (1)';
+  const LOOP_LINES = [
+    '<span class="kw">while</span> (<span class="num">1</span>) {',
+    '    <span class="fn">HAL_GPIO_TogglePin</span>(<span class="macro">GPIOC</span>, <span class="macro">GPIO_PIN_15</span>);',
+    '    <span class="fn">HAL_Delay</span>(<span class="num">500</span>);',
+    '}'
+  ];
+  const loopLineEls = LOOP_LINES.map(function(html, i){
+    const d = mkIn(panels.loop, 'div', 'code-line', {
+      left: '70px', right: '20px', top: (60 + i * 42) + 'px', height: '32px'
+    });
+    d.innerHTML = html; return d;
+  });
+
+  /* callback */
+  const cbTag = mkIn(panels.cb, 'div', 'panel-tag');
+  cbTag.id = 'cbTag';
+  cbTag.textContent = 'INTERRUPT CALLBACK';
+  mkIn(panels.cb, 'div', 'panel-head').textContent = '回调 · HAL_UART_RxCpltCallback';
+  const CB_LINES = [
+    '<span class="kw">void</span>&nbsp;<span class="fn">uart2RxCallback</span>(UART_HandleTypeDef *huart) {',
+    '    <span class="cmt">// 收满 4 字节，重新启动接收</span>',
+    '    <span class="fn">HAL_UART_Receive_IT</span>(&amp;huart2, rxBuffer, <span class="num">4</span>);',
+    '}'
+  ];
+  const cbLineEls = CB_LINES.map(function(html, i){
+    const d = mkIn(panels.cb, 'div', 'code-line', {
+      left: '40px', right: '20px', top: (60 + i * 42) + 'px', height: '32px'
+    });
+    d.innerHTML = html; return d;
+  });
+
+  const cpu = document.getElementById('cpu');
+  const hand = document.getElementById('hand');
+  const intSignal = document.getElementById('intSignal');
+  const statusEl = document.getElementById('status');
+
+  /* 状态 */
+  let handX = 0, handY = 0;
+  let cpuPos = { x: LOOP_CPU_X, y: LOOP_LINE_Y[1] };
+  let cpuAttached = false;
+
+  function syncCpuToHand(){
+    const cx = handX + HAND_CLAW_OX - CPU_SIZE/2;
+    const cy = handY + HAND_CLAW_OY - CPU_SIZE/2;
+    cpu.style.transition = 'none';
+    cpu.style.transform = `translate(${cx}px, ${cy}px)`;
+    cpuPos.x = cx; cpuPos.y = cy;
+  }
+
+  function moveHandTo(targetX, targetY, dur, easeName){
+    dur = dur || 500;
+    easeName = easeName || 'easeOutCubic';
+    const startX = handX, startY = handY;
+    return new Promise(function(resolve){
+      const t0 = performance.now();
+      function ease(t){
+        if (easeName === 'easeOutHard') return 1 - Math.pow(1 - t, 4);
+        return 1 - Math.pow(1 - t, 3);
+      }
+      function tick(){
+        const t = Math.min((performance.now() - t0) / dur, 1);
+        const e = ease(t);
+        handX = startX + (targetX - startX) * e;
+        handY = startY + (targetY - startY) * e;
+        hand.style.transition = 'none';
+        hand.style.transform = `translate(${handX}px, ${handY}px)`;
+        if (cpuAttached) syncCpuToHand();
+        if (t < 1) requestAnimationFrame(tick);
+        else resolve();
+      }
+      requestAnimationFrame(tick);
+    });
+  }
+
+  function setCPU(x, y){
+    cpuPos.x = x; cpuPos.y = y;
+    cpu.style.transition = 'none';
+    cpu.style.transform = `translate(${x}px, ${y}px)`;
+    void cpu.offsetWidth;
+  }
+  function moveCPU(x, y, dur, ease){
+    dur = dur || 500;
+    ease = ease || 'cubic-bezier(.45,.05,.2,1)';
+    return new Promise(function(res){
+      cpu.style.transition = `transform ${dur}ms ${ease}, opacity .3s ease`;
+      void cpu.offsetWidth;
+      cpu.style.transform = `translate(${x}px, ${y}px)`;
+      cpuPos.x = x; cpuPos.y = y;
+      setTimeout(res, dur + 15);
+    });
+  }
+
+  /* ============================================================
+     手的动作
+     ============================================================ */
+  async function handAppearAtRDR(){
+    const rdrBottom = P.rdr.y + P.rdr.h;
+    handX = RDR_CX - HAND_CLAW_OX;
+    handY = rdrBottom + 20 - HAND_CLAW_OY;
+
+    hand.classList.remove('grabbing');
+    hand.style.transition = 'none';
+    hand.style.opacity = '0';
+    hand.style.transform = `translate(${handX}px, ${handY}px) scale(0.4)`;
+    void hand.offsetWidth;
+
+    hand.style.transition = 'opacity .25s, transform .35s cubic-bezier(.34,1.56,.64,1)';
+    hand.style.opacity = '1';
+    hand.style.transform = `translate(${handX}px, ${handY}px) scale(1)`;
+    await sleep(380);
+  }
+
+  /* 手追赶 CPU —— 每帧读 CPU 当前位置，边追边对准
+     手在追赶期间 CPU 还在 while 循环里跑 */
+  async function handChaseAndGrabCPU(){
+    const startX = handX, startY = handY;
+    const t0 = performance.now();
+    const CHASE_DURATION = 620;
+
+    return new Promise(function(resolve){
+      function tick(){
+        const t = Math.min((performance.now() - t0) / CHASE_DURATION, 1);
+        const e = 1 - Math.pow(1 - t, 3);  // easeOutCubic
+
+        // 每帧读取 CPU 当前位置作为目标
+        const cpuCx = cpuPos.x + CPU_SIZE/2;
+        const cpuCy = cpuPos.y + CPU_SIZE/2;
+        const tgtHandX = cpuCx - HAND_CLAW_OX;
+        const tgtHandY = cpuCy - HAND_CLAW_OY;
+
+        // 从起点向"当前目标"插值
+        handX = startX + (tgtHandX - startX) * e;
+        handY = startY + (tgtHandY - startY) * e;
+        hand.style.transition = 'none';
+        hand.style.transform = `translate(${handX}px, ${handY}px)`;
+
+        if (t < 1){
+          requestAnimationFrame(tick);
+        } else {
+          // 最后精确对齐一次
+          handX = cpuPos.x + CPU_SIZE/2 - HAND_CLAW_OX;
+          handY = cpuPos.y + CPU_SIZE/2 - HAND_CLAW_OY;
+          hand.style.transition = 'none';
+          hand.style.transform = `translate(${handX}px, ${handY}px)`;
+          resolve();
+        }
+      }
+      requestAnimationFrame(tick);
+    });
+  }
+
+  /* CPU 挣扎抖动 */
+  async function cpuStruggle(){
+    cpu.classList.add('grabbed');
+    const bx = handX, by = handY;
+    const seq = [8,-8,6,-6,4,-4,2,-2,0];
+    const delay = [45,45,40,40,38,38,35,35,30];
+    for (let i = 0; i < seq.length; i++){
+      handX = bx + seq[i];
+      handY = by;
+      hand.style.transition = 'none';
+      hand.style.transform = `translate(${handX}px, ${handY}px)`;
+      syncCpuToHand();
+      await sleep(delay[i]);
+    }
+    handX = bx; handY = by;
+    hand.style.transform = `translate(${bx}px, ${by}px)`;
+    syncCpuToHand();
+    cpu.classList.remove('grabbed');
+  }
+
+  async function handCarryCPUToCpuPos(targetCpuX, targetCpuY, dur){
+    const targetHandX = targetCpuX + CPU_SIZE/2 - HAND_CLAW_OX;
+    const targetHandY = targetCpuY + CPU_SIZE/2 - HAND_CLAW_OY;
+    await moveHandTo(targetHandX, targetHandY, dur || 620, 'easeOutHard');
+  }
+
+  async function handReleaseAndHide(){
+    cpuAttached = false;
+    hand.classList.remove('grabbing');
+    await sleep(140);
+    await moveHandTo(handX + 6, handY - 60, 340, 'easeOutCubic');
+    hand.style.transition = 'opacity .3s ease';
+    hand.style.opacity = '0';
+    await sleep(320);
+  }
+
+  async function handReappearAndGrabCPU(){
+    handX = cpuPos.x + CPU_SIZE/2 - HAND_CLAW_OX;
+    handY = cpuPos.y - 50 - HAND_CLAW_OY;
+
+    hand.classList.remove('grabbing');
+    hand.style.transition = 'none';
+    hand.style.opacity = '0';
+    hand.style.transform = `translate(${handX}px, ${handY}px) scale(0.6)`;
+    void hand.offsetWidth;
+
+    hand.style.transition = 'opacity .25s, transform .3s cubic-bezier(.34,1.56,.64,1)';
+    hand.style.opacity = '1';
+    hand.style.transform = `translate(${handX}px, ${handY}px) scale(1)`;
+    await sleep(340);
+
+    const targetX = cpuPos.x + CPU_SIZE/2 - HAND_CLAW_OX;
+    const targetY = cpuPos.y + CPU_SIZE/2 - HAND_CLAW_OY;
+    await moveHandTo(targetX, targetY, 280, 'easeOutHard');
+
+    hand.classList.add('grabbing');
+    await sleep(120);
+    cpuAttached = true;
+    syncCpuToHand();
+  }
+
+  /* 高亮 */
+  function highlightLoop(i){
+    loopLineEls.forEach(l => l.classList.remove('running','active','interrupt'));
+    if (i >= 0) loopLineEls[i].classList.add('running');
+  }
+  function interruptLoop(i){
+    loopLineEls.forEach(l => l.classList.remove('running','active','interrupt'));
+    if (i >= 0) loopLineEls[i].classList.add('interrupt');
+  }
+  function highlightCB(i, cls){
+    cbLineEls.forEach(l => l.classList.remove('active','done'));
+    if (i !== undefined && cls) cbLineEls[i].classList.add(cls);
+  }
+
+  /* while 循环 —— 可打断，用 loopPromise 追踪完全退出时机 */
+  let loopToken = null;
+  let loopPromise = null;
+  let currentLoopLine = 1;
+
+  function runWhileLoop(){
+    const myToken = {};
+    loopToken = myToken;
+    loopPromise = (async function(){
+      while (loopToken === myToken){
+        if (loopToken !== myToken) return;
+        currentLoopLine = 1; highlightLoop(1);
+        await moveCPU(LOOP_CPU_X, LOOP_LINE_Y[1], 380);
+        if (loopToken !== myToken) return;
+        await sleep(450);
+        if (loopToken !== myToken) return;
+        currentLoopLine = 2; highlightLoop(2);
+        await moveCPU(LOOP_CPU_X, LOOP_LINE_Y[2], 380);
+        if (loopToken !== myToken) return;
+        await sleep(450);
+        if (loopToken !== myToken) return;
+        currentLoopLine = 0; highlightLoop(0);
+        await moveCPU(LOOP_CPU_X, LOOP_LINE_Y[0], 380);
+        if (loopToken !== myToken) return;
+        await sleep(260);
+      }
+    })();
+  }
+  async function stopWhileLoop(){
+    loopToken = null;
+    if (loopPromise){
+      await loopPromise;
+      loopPromise = null;
+    }
+  }
+
+  /* 字节粒子 */
+  let rdrParticle = null;
+  async function flyByteIntoRDR(ch, fromX, fromY){
+    const fly = mkIn(stage, 'div', 'fly-byte');
+    fly.textContent = ch;
+    rdrParticle = fly;
+    fly.style.transition = 'none';
+    fly.style.transform = `translate(${fromX - 16}px, ${fromY - 16}px) scale(1)`;
+    fly.style.opacity = '1';
+    void fly.offsetWidth;
+    fly.style.transition = 'transform .6s cubic-bezier(.4,0,.3,1)';
+    fly.style.transform = `translate(${RDR_CX - 16}px, ${RDR_CY - 16}px) scale(1)`;
+    await sleep(620);
+  }
+
+  async function fireIntSignal(fromX, fromY, toX, toY, dur){
+    dur = dur || 260;
+    const dx = toX - fromX, dy = toY - fromY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    intSignal.style.transition = 'none';
+    intSignal.style.transformOrigin = 'left center';
+    intSignal.style.transform =
+      `translate(${fromX}px, ${fromY - 3}px) rotate(${angle}deg) scaleX(${dist / 70})`;
+    intSignal.style.opacity = '1';
+    void intSignal.offsetWidth;
+    intSignal.style.transition = `opacity ${dur}ms ease`;
+    intSignal.style.opacity = '0';
+    await sleep(dur);
+  }
+
+  async function takeByteFromRDRtoCPU(ch){
+    const fly = rdrParticle;
+    if (!fly) return;
+    const tx = cpuPos.x + CPU_SIZE/2 - 16;
+    const ty = cpuPos.y + CPU_SIZE/2 - 16;
+    fly.style.transition = 'transform .5s cubic-bezier(.4,0,.2,1), opacity .3s .32s';
+    fly.style.transform = `translate(${tx}px, ${ty}px) scale(0.65)`;
+    fly.style.opacity = '0';
+    await sleep(540);
+    if (fly.parentNode) fly.parentNode.removeChild(fly);
+    rdrParticle = null;
+    rdrSlot.classList.remove('has');
+    rxne.classList.remove('on');
+    rxneText.nodeValue = 'RXNE = 0';
+    const badge = mkIn(cpu, 'div', 'cpu-badge');
+    badge.textContent = ch;
+    await sleep(30);
+    badge.classList.add('show');
+    await sleep(220);
+  }
+
+  async function cpuSelfCarryToBuf(idx){
+    const slotCx = P.buf.x + 40 + idx * 75;
+    const slotCy = P.buf.y + 85;
+    const targetX = slotCx - CPU_SIZE/2;
+    const targetY = slotCy - CPU_SIZE/2;
+    await moveCPU(targetX, targetY, 760, 'cubic-bezier(.4,0,.25,1)');
+    await sleep(220);
+    const badge = cpu.querySelector('.cpu-badge');
+    if (badge){
+      badge.classList.remove('show');
+      setTimeout(function(){
+        if (badge.parentNode) badge.parentNode.removeChild(badge);
+      }, 300);
+    }
+    bufSlots[idx].querySelector('.val').textContent = DATA[idx].ch;
+    bufSlots[idx].classList.add('filled');
+    await sleep(340);
+  }
+
+  /* 重置 */
+  const dynamic = [];
+  function resetAll(){
+    loopToken = null;
+    loopPromise = null;
+    rdrParticle = null;
+    cpuAttached = false;
+    dynamic.forEach(e => { if (e && e.parentNode) e.parentNode.removeChild(e); });
+    dynamic.length = 0;
+
+    for (const k in panels) panels[k].classList.remove('on');
+    loopTag.classList.remove('show');
+    cbTag.classList.remove('show');
+
+    pcChars.forEach(c => c.classList.remove('sending','done'));
+    rdrSlot.classList.remove('has');
+    rxne.classList.remove('on','pulse');
+    rxneText.nodeValue = 'RXNE = 0';
+    bufSlots.forEach(s => {
+      s.classList.remove('filled');
+      s.querySelector('.val').textContent = '';
+    });
+    loopLineEls.forEach(l => l.classList.remove('running','active','interrupt'));
+    cbLineEls.forEach(l => l.classList.remove('active','done'));
+
+    cpu.classList.remove('visible','grabbed','inCB');
+    while (cpu.firstChild) cpu.removeChild(cpu.firstChild);
+    cpu.textContent = 'CPU';
+    setCPU(LOOP_CPU_X, LOOP_LINE_Y[1]);
+
+    hand.style.opacity = '0';
+    hand.classList.remove('grabbing');
+    handX = LOOP_CPU_X + CPU_SIZE/2 - HAND_CLAW_OX;
+    handY = LOOP_LINE_Y[1] + CPU_SIZE/2 - HAND_CLAW_OY;
+    hand.style.transition = 'none';
+    hand.style.transform = `translate(${handX}px, ${handY}px)`;
+
+    intSignal.style.opacity = '0';
+    statusEl.textContent = '准备中…';
+    statusEl.classList.remove('warn','ok');
+  }
+
+  async function sceneSetup(){
+    panels.pc.classList.add('on');
+    panels.loop.classList.add('on');
+    panels.cb.classList.add('on');
+    panels.rdr.classList.add('on');
+    panels.buf.classList.add('on');
+    loopTag.classList.add('show');
+    cbTag.classList.add('show');
+    statusEl.textContent = 'MCU 启动，注册回调 + 启动首次接收';
+    await sleep(900);
+    cpu.classList.add('visible');
+    setCPU(LOOP_CPU_X, LOOP_LINE_Y[1]);
+    statusEl.textContent = 'CPU 正在 while(1) 里循环执行其他代码…';
+    runWhileLoop();
+    await sleep(1600);
+  }
+
+  /* 单次中断处理
+     CPU 不会停下来等，直到被手追上抓住才停 */
+  async function sceneInterrupt(idx){
+    const d = DATA[idx];
+
+    /* ① PC 发送 */
+    pcChars[idx].classList.add('sending');
+    statusEl.textContent = 'PC 发送第 ' + (idx+1) + ' 字节「' + d.ch + '」…';
+    await sleep(320);
+
+    /* ② 字节飞入 RDR */
+    const src = pcCharCenter(idx);
+    await flyByteIntoRDR(d.ch, src.x, src.y);
+
+    /* ③ RXNE 置位 */
+    rdrSlot.classList.add('has');
+    rxne.classList.add('on');
+    rxne.classList.add('pulse');
+    rxneText.nodeValue = 'RXNE = 1';
+    setTimeout(() => rxne.classList.remove('pulse'), 580);
+    pcChars[idx].classList.remove('sending');
+    pcChars[idx].classList.add('done');
+
+    statusEl.textContent = '⚡ RDR 收到「' + d.ch + '」→ RXNE = 1 → 硬件触发中断！';
+    statusEl.classList.add('warn');
+
+    /* ④ 中断信号射向 CPU（此时 CPU 还在 while 循环里跑） */
+    const rdrBottom = P.rdr.y + P.rdr.h;
+    fireIntSignal(
+      RDR_CX, rdrBottom + 4,
+      cpuPos.x + CPU_SIZE/2, cpuPos.y + CPU_SIZE/2,
+      280
+    );
+
+    /* ⑤ 手从 RDR 下方出现 */
+    await handAppearAtRDR();
+
+    /* ⑥ 手开始追 CPU —— CPU 继续跑，直到被追上 */
+    statusEl.textContent = '⚡ 硬件中断信号到达 → 手追向正在运行的 CPU…';
+    await sleep(120);
+
+    // 追的过程中先发出"打断信号"，让 while 循环在当前步结束后退出
+    // 但 CPU 视觉上会继续跑完当前 moveCPU，等真正被抓住才停
+    setTimeout(() => { loopToken = null; }, 200);
+
+    await handChaseAndGrabCPU();
+
+    /* ⑦ 手抓住 CPU —— 此时 CPU 已经停下（loopToken 已被清） */
+    hand.classList.add('grabbing');
+    await sleep(140);
+
+    // 等 while 循环完全退出（确保 CPU 已经静止）
+    if (loopPromise){
+      await loopPromise;
+      loopPromise = null;
+    }
+
+    // 精确对齐（此时 CPU 位置固定）
+    handX = cpuPos.x + CPU_SIZE/2 - HAND_CLAW_OX;
+    handY = cpuPos.y + CPU_SIZE/2 - HAND_CLAW_OY;
+    hand.style.transition = 'none';
+    hand.style.transform = `translate(${handX}px, ${handY}px)`;
+    cpuAttached = true;
+    syncCpuToHand();
+
+    // 当前所在行变红闪（被打断）
+    interruptLoop(currentLoopLine);
+
+    statusEl.textContent = '⚡ CPU 被打断 → 正在挣扎…';
+    await sleep(160);
+
+    /* ⑧ CPU 挣扎抖动 */
+    await cpuStruggle();
+    await sleep(60);
+
+    statusEl.textContent = '⚡ 手把 CPU 拽向 RDR';
+    await sleep(200);
+
+    /* ⑨ 手带 CPU 到 RDR 旁 */
+    await handCarryCPUToCpuPos(CPU_RDR.x, CPU_RDR.y, 620);
+    await sleep(120);
+
+    /* ⑩ 手松开 CPU 并消失 */
+    await handReleaseAndHide();
+
+    /* ⑪ CPU 从 RDR 取走字节 */
+    statusEl.textContent = 'CPU 从 RDR 读取字节「' + d.ch + '」…';
+    await takeByteFromRDRtoCPU(d.ch);
+
+    /* ⑫ CPU 自己走去 rxBuffer 存下 */
+    statusEl.textContent = 'CPU 自己把「' + d.ch + '」搬运到 rxBuffer[' + idx + ']…';
+    await cpuSelfCarryToBuf(idx);
+
+    /* ⑬ 手重新出现，抓住 CPU */
+    await handReappearAndGrabCPU();
+
+    /* ⑭ 手带 CPU 回 while（或去 callback） */
+    if (idx < 3){
+      statusEl.textContent = '手把 CPU 送回 while 循环…';
+      await handCarryCPUToCpuPos(LOOP_CPU_X, LOOP_LINE_Y[1], 660);
+      await handReleaseAndHide();
+      statusEl.textContent = 'CPU 继续执行 while 循环里其他代码…';
+      statusEl.classList.remove('warn');
+      runWhileLoop();
+      await sleep(1200);
+    } else {
+      statusEl.textContent = '⚠ 4 字节收齐 → HAL 触发 RxCpltCallback！';
+      await sleep(420);
+
+      await handCarryCPUToCpuPos(CPU_CB.x, CPU_CB.y, 660);
+      cpu.classList.add('inCB');
+      await sleep(200);
+
+      highlightCB(2, 'active');
+      statusEl.textContent = '执行回调：HAL_UART_Receive_IT() —— 重新装载下一轮接收';
+      await sleep(900);
+      highlightCB(2, 'done');
+      await sleep(380);
+
+      statusEl.textContent = '回调执行完毕，手把 CPU 送回 while 循环';
+      await handCarryCPUToCpuPos(LOOP_CPU_X, LOOP_LINE_Y[1], 700);
+      cpu.classList.remove('inCB');
+      await handReleaseAndHide();
+      statusEl.textContent = '接收重启完成，CPU 继续执行其他代码…';
+      statusEl.classList.remove('warn');
+      runWhileLoop();
+      await sleep(1200);
+    }
+  }
+
+  /* 主流程 */
+  let running = false;
+  async function run(){
+    if (running) return;
+    running = true;
+    try {
+      resetAll();
+      await sleep(500);
+      await sceneSetup();
+      for (let i = 0; i < 4; i++){
+        await sceneInterrupt(i);
+        if (i < 3) await sleep(300);
+      }
+      await stopWhileLoop();
+      statusEl.textContent = '✓ rxBuffer = { ' + DATA.map(d => d.ch).join(', ') + ' } · 中断接收流程完成';
+      statusEl.classList.add('ok');
+    } catch(err){
+      console.error(err);
+      statusEl.textContent = '出错：' + err.message;
+    }
+    running = false;
+  }
+
+  function fit(){
+    let s = Math.min(window.innerWidth / 1240, window.innerHeight / 760, 1.3);
+    if (s < 0.3) s = 0.3;
+    stage.style.transform = 'scale(' + s + ')';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+  document.getElementById('replay').addEventListener('click', () => {
+    if (running) return;
+    run();
+  });
+  setTimeout(run, 700);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>STM32 UART 接收超时</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{
+    height:100%;background:#02040a;overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  #viewport{
+    position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    overflow:hidden;
+  }
+  #stage{
+    position:relative;width:1200px;height:720px;flex:none;
+    background:radial-gradient(circle at 18% 8%,#0c1728 0%,#060b16 58%,#02040a 100%);
+    border:1px solid rgba(120,180,255,.08);
+    border-radius:24px;overflow:hidden;
+    transform-origin:center center;
+    box-shadow:0 40px 100px rgba(0,0,0,.8);
+  }
+
+  #title{
+    position:absolute;top:14px;left:0;right:0;text-align:center;
+    font-size:17px;font-weight:700;letter-spacing:3px;
+    color:#c9e0ff;text-shadow:0 0 26px rgba(56,189,248,.3);z-index:5;
+  }
+  #subtitle{
+    position:absolute;top:38px;left:0;right:0;text-align:center;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:10.5px;color:#33506f;letter-spacing:.3px;z-index:5;
+  }
+  #subtitle b{color:#38bdf8;font-weight:600}
+
+  /* 面板通用 */
+  .panel{
+    position:absolute;
+    background:rgba(255,255,255,.024);
+    border:1px solid rgba(120,170,240,.14);
+    border-radius:18px;
+    opacity:0;
+    transition:opacity .55s ease, box-shadow .4s ease, border-color .4s ease;
+    box-shadow:0 14px 40px rgba(0,0,0,.45);
+  }
+  .panel.on{ opacity:1 }
+  .panel-head{
+    position:absolute;left:16px;top:11px;
+    font-size:11px;font-weight:600;letter-spacing:1.2px;
+    color:#6d93bd;white-space:nowrap;
+  }
+
+  /* ---------- PC 冰冻面板 ---------- */
+  #pcPanel{
+    background:rgba(150,200,255,.03);
+    border-color: rgba(150,210,255,.28);
+    box-shadow: 0 14px 40px rgba(0,0,0,.45),
+                inset 0 0 60px rgba(150,210,255,.06),
+                0 0 26px rgba(150,210,255,.12);
+  }
+  #pcPanel .panel-head{
+    color:#7fb8e8;
+  }
+  #pcPanel .pc-msg{
+    position:absolute;left:18px;top:38px;right:18px;
+    font-size:12.5px;color:#8fb8d8;letter-spacing:.4px;
+    font-family:ui-monospace,"PingFang SC",monospace;
+    text-shadow:0 0 10px rgba(150,210,255,.35);
+  }
+  #pcPanel .pc-chars{
+    position:absolute;left:0;right:0;top:88px;
+    display:flex;justify-content:center;gap:14px;
+  }
+  .pc-char{
+    width:56px;height:66px;
+    display:flex;align-items:center;justify-content:center;
+    border-radius:12px;
+    border:2px solid rgba(150,200,255,.32);
+    background:rgba(150,200,255,.07);
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:30px;font-weight:800;color:#6fa5d4;
+    text-shadow:0 0 12px rgba(150,210,255,.5);
+    box-shadow: inset 0 0 18px rgba(150,210,255,.12);
+    position:relative;
+  }
+  /* 每个字符上覆一层薄冰 */
+  .pc-char::after{
+    content:'';
+    position:absolute;
+    inset:-1px;
+    border-radius:12px;
+    background:linear-gradient(135deg,
+      rgba(220,240,255,.22) 0%,
+      rgba(180,220,255,.05) 40%,
+      rgba(220,240,255,.15) 100%);
+    pointer-events:none;
+  }
+  /* 冰覆盖层 */
+  .pc-ice{
+    position:absolute;
+    inset:-2px;
+    border-radius:20px;
+    pointer-events:none;
+    background:linear-gradient(135deg,
+      rgba(200,230,255,.18) 0%,
+      rgba(140,190,240,.04) 25%,
+      rgba(200,230,255,.10) 50%,
+      rgba(160,210,250,.05) 72%,
+      rgba(210,235,255,.20) 100%);
+    animation: iceShine 5s ease-in-out infinite;
+  }
+  @keyframes iceShine{
+    0%,100%{ opacity:.5 }
+    50%    { opacity:.95 }
+  }
+  /* 霜花点 */
+  .pc-frost{
+    position:absolute;
+    inset:0;
+    border-radius:18px;
+    pointer-events:none;
+    background:
+      radial-gradient(circle at 12% 18%, rgba(210,235,255,.18) 0%, transparent 7%),
+      radial-gradient(circle at 82% 28%, rgba(210,235,255,.14) 0%, transparent 8%),
+      radial-gradient(circle at 42% 82%, rgba(210,235,255,.12) 0%, transparent 7%),
+      radial-gradient(circle at 92% 88%, rgba(210,235,255,.16) 0%, transparent 6%),
+      radial-gradient(circle at 60% 15%, rgba(210,235,255,.10) 0%, transparent 5%);
+  }
+  /* 雪花装饰 */
+  .snowflake{
+    position:absolute;
+    font-family:ui-monospace,monospace;
+    color: rgba(210,235,255,.75);
+    text-shadow:0 0 12px rgba(180,220,255,.85);
+    pointer-events:none;
+    user-select:none;
+    animation: snowTwinkle 3.2s ease-in-out infinite;
+  }
+  @keyframes snowTwinkle{
+    0%,100%{ opacity:.35; transform:scale(.9) }
+    50%    { opacity:1;  transform:scale(1.1) }
+  }
+  /* 冰冻标签 */
+  .frozen-tag{
+    position:absolute;
+    left:50%; bottom:12px;
+    transform:translateX(-50%);
+    font-family:ui-monospace,monospace;
+    font-size:10px; font-weight:700;
+    letter-spacing:2.5px;
+    color:#9fd0f5;
+    padding:3px 12px;
+    border:1px solid rgba(150,210,255,.45);
+    border-radius:20px;
+    background:rgba(150,200,255,.08);
+    box-shadow: 0 0 16px rgba(150,210,255,.25),
+                inset 0 0 12px rgba(150,210,255,.1);
+    text-shadow:0 0 10px rgba(180,220,255,.7);
+  }
+
+  /* ---------- RDR 监听呼吸 ---------- */
+  .panel.listening{
+    border-color: rgba(56,189,248,.5);
+    animation: listenPulse 2s ease-in-out infinite;
+  }
+  @keyframes listenPulse{
+    0%,100%{
+      box-shadow: 0 0 0 1px rgba(56,189,248,.2),
+                  0 0 22px rgba(56,189,248,.15),
+                  0 14px 40px rgba(0,0,0,.45);
+    }
+    50%{
+      box-shadow: 0 0 0 2px rgba(56,189,248,.45),
+                  0 0 38px rgba(56,189,248,.3),
+                  0 14px 40px rgba(0,0,0,.45);
+    }
+  }
+
+  /* ---------- 代码面板 ---------- */
+  .code-line{
+    position:absolute;
+    display:flex;align-items:center;
+    padding:0 14px;height:28px;
+    border-radius:8px;
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    font-size:12px;line-height:1;white-space:pre;
+    color:#7f9cbe;
+    transition:background .3s,box-shadow .3s,color .3s;
+  }
+  .code-line.active{
+    background:rgba(56,189,248,.16);
+    box-shadow:inset 0 0 0 1px rgba(56,189,248,.4),0 0 26px rgba(56,189,248,.12);
+    color:#e0f2fe;
+  }
+  .code-line.waiting{
+    background:rgba(56,189,248,.10);
+    box-shadow:inset 0 0 0 1px rgba(56,189,248,.28),0 0 26px rgba(56,189,248,.08);
+    color:#c9e4ff;
+    animation:waitPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes waitPulse{
+    0%,100%{ box-shadow:inset 0 0 0 1px rgba(56,189,248,.28),0 0 22px rgba(56,189,248,.06) }
+    50%    { box-shadow:inset 0 0 0 1px rgba(56,189,248,.55),0 0 34px rgba(56,189,248,.25) }
+  }
+  .code-line.timeout{
+    background:rgba(244,63,94,.14);
+    box-shadow:inset 0 0 0 1px rgba(244,63,94,.5),0 0 30px rgba(244,63,94,.18);
+    color:#fda4af;
+  }
+  .code-line.done{
+    background:rgba(52,211,153,.12);
+    box-shadow:inset 0 0 0 1px rgba(52,211,153,.32),0 0 22px rgba(52,211,153,.08);
+    color:#a7f3d0;
+  }
+  .kw{color:#c084fc}
+  .fn{color:#fbbf24}
+  .num{color:#f472b6}
+  .cmt{color:#3d5673;font-style:italic}
+
+  /* ---------- RDR 位槽 ---------- */
+  .rdr-slot{
+    position:absolute;
+    display:flex;align-items:center;justify-content:center;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:11px;font-weight:800;
+    color:transparent;
+    border:1.5px dashed rgba(120,170,240,.22);
+    background:rgba(255,255,255,.02);
+    border-radius:5px;
+    transition:all .3s ease;
+  }
+  .rdr-slot-tag{
+    position:absolute;
+    font-family:ui-monospace,monospace;
+    font-size:7.5px;color:#4d6b8f;
+    text-align:center;letter-spacing:.3px;
+  }
+
+  #rdrByte{
+    position:absolute;
+    display:flex;align-items:center;justify-content:center;
+    font-family:ui-monospace,monospace;
+    font-size:24px;font-weight:800;
+    color:#41597a;
+    border:2px dashed rgba(120,170,240,.22);
+    border-radius:10px;
+    transition:all .3s ease;
+    letter-spacing:2px;
+  }
+
+  #rxne{
+    position:absolute;
+    display:flex;align-items:center;gap:7px;
+    font-family:ui-monospace,monospace;
+    font-size:10.5px;color:#3d5678;letter-spacing:1.2px;
+    transition:color .25s;
+  }
+  #rxne .led{
+    width:11px;height:11px;border-radius:50%;
+    background:#28374a;transition:all .25s;
+  }
+
+  /* 超时进度条 */
+  #timeoutBar{
+    position:absolute;
+    height:12px;
+    background:rgba(255,255,255,.04);
+    border:1px solid rgba(120,170,240,.22);
+    border-radius:6px;
+    overflow:hidden;
+    opacity:0;
+    transition:opacity .4s;
+  }
+  #timeoutBar.show{ opacity:1 }
+  #timeoutFill{
+    height:100%;
+    width:0%;
+    background:linear-gradient(90deg,#38bdf8,#0ea5e9);
+    border-radius:5px;
+    transition:background .5s;
+  }
+  #timeoutText{
+    position:absolute;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:11px;color:#7fa3cc;letter-spacing:.5px;
+    text-align:center;
+    opacity:0;
+    transition:opacity .4s,color .3s;
+  }
+  #timeoutText.show{ opacity:1 }
+  #timeoutText.warn{ color:#fda4af; text-shadow:0 0 12px rgba(244,63,94,.4) }
+
+  /* ---------- rxBuffer ---------- */
+  .mem-slot{
+    position:absolute;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    border:2px dashed rgba(120,170,240,.2);
+    border-radius:12px;
+    background:rgba(255,255,255,.016);
+  }
+  .mem-slot .val{
+    font-size:24px;font-weight:800;line-height:1;color:#41597a;
+  }
+  .mem-slot .idx{
+    font-size:9px;color:#3d5a7d;margin-top:4px;letter-spacing:.5px;
+  }
+
+  /* ---------- CPU ---------- */
+  #cpu{
+    position:absolute;left:0;top:0;
+    width:44px;height:44px;border-radius:11px;
+    background:linear-gradient(150deg,#6cabff,#2563eb 58%,#1d4ed8);
+    display:flex;align-items:center;justify-content:center;
+    font-size:10px;font-weight:900;letter-spacing:.9px;color:#fff;
+    text-shadow:0 1px 3px rgba(0,0,0,.45);
+    box-shadow:0 0 26px rgba(59,130,246,.6),0 0 70px rgba(59,130,246,.2),
+               inset 0 1px 0 rgba(255,255,255,.4);
+    z-index:300;opacity:0;
+    transition:opacity .45s ease;
+    will-change:transform;
+  }
+  #cpu.visible{ opacity:1 }
+  #cpu.alert{
+    animation:cpuAlert .6s ease;
+  }
+  @keyframes cpuAlert{
+    0%{ box-shadow:0 0 26px rgba(59,130,246,.6),0 0 70px rgba(59,130,246,.2) }
+    50%{ box-shadow:0 0 40px rgba(244,63,94,.9),0 0 90px rgba(244,63,94,.4) }
+    100%{ box-shadow:0 0 26px rgba(59,130,246,.6),0 0 70px rgba(59,130,246,.2) }
+  }
+
+  /* ---------- 状态栏 ---------- */
+  #status{
+    position:absolute;left:0;right:0;bottom:22px;text-align:center;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:12px;color:#5d7ea6;letter-spacing:.4px;
+    transition:color .4s;z-index:5;
+  }
+  #status.warn{ color:#fda4af; text-shadow:0 0 18px rgba(244,63,94,.35) }
+  #status.done{ color:#34d399; text-shadow:0 0 20px rgba(52,211,153,.35) }
+
+  #replay{
+    position:absolute;right:18px;top:14px;z-index:999;
+    padding:6px 15px;border-radius:9px;cursor:pointer;
+    background:rgba(56,189,248,.09);
+    border:1px solid rgba(56,189,248,.32);
+    color:#7dd3fc;font-size:11.5px;font-family:inherit;
+    letter-spacing:.5px;transition:all .2s;
+  }
+  #replay:hover{background:rgba(56,189,248,.22);color:#e0f2fe}
+  #replay:active{transform:scale(.94)}
+</style>
+</head>
+<body>
+<div id="viewport">
+  <div id="stage">
+    <div id="title">STM32 UART 接收超时</div>
+    <div id="subtitle">HAL_StatusTypeDef status = <b>HAL_UART_Receive</b>(&amp;huart2, rxBuffer, sizeof(rxBuffer), 1000);</div>
+
+    <div id="pcPanel"   class="panel"></div>
+    <div id="codePanel" class="panel"></div>
+    <div id="rdrPanel"  class="panel"></div>
+    <div id="bufPanel"  class="panel"></div>
+
+    <div id="cpu">CPU</div>
+
+    <div id="status">准备中…</div>
+    <button id="replay">▶ 重播</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  const stage = document.getElementById('stage');
+  const sleep = ms => new Promise(r => setTimeout(r, Math.max(40, ms)));
+
+  /* 面板基础位置 */
+  const BASE = {
+    pc:   { x: 20,  y: 70,  w: 340, h: 250 },
+    code: { x: 20,  y: 350, w: 660, h: 330 },
+    rdr:  { x: 700, y: 70,  w: 460, h: 270 },
+    buf:  { x: 700, y: 370, w: 460, h: 310 }
+  };
+
+  const CPU_SIZE = 44;
+
+  /* 代码面板内部坐标 */
+  const CODE_TOP  = 50;
+  const CODE_STEP = 40;
+  const CODE_LX   = 80;
+  const CPU_CODE_LX = 30;
+  const HAL_RECEIVE_LINE = 4;
+
+  function mkIn(parent, tag, cls, styles){
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (styles) for (const k in styles){ try{ e.style[k] = styles[k]; }catch(_){} }
+    parent.appendChild(e);
+    return e;
+  }
+
+  const panels = {
+    pc:   document.getElementById('pcPanel'),
+    code: document.getElementById('codePanel'),
+    rdr:  document.getElementById('rdrPanel'),
+    buf:  document.getElementById('bufPanel')
+  };
+
+  for (const k in panels){
+    const b = BASE[k], p = panels[k];
+    p.style.left   = b.x + 'px';
+    p.style.top    = b.y + 'px';
+    p.style.width  = b.w + 'px';
+    p.style.height = b.h + 'px';
+  }
+
+  /* ============================================================
+     PC —— 被冰冻的发送方
+  ============================================================ */
+  mkIn(panels.pc, 'div', 'panel-head').textContent = 'PC · 发送方';
+
+  const pcMsg = mkIn(panels.pc, 'div', 'pc-msg');
+  pcMsg.textContent = '❄ 已被冻结 · 不会发送任何数据';
+
+  const pcCharsWrap = mkIn(panels.pc, 'div', 'pc-chars');
+  ['H','A','L','!'].forEach(function(ch){
+    const c = mkIn(pcCharsWrap, 'div', 'pc-char');
+    c.textContent = ch;
+  });
+
+  /* 冰覆盖层 */
+  mkIn(panels.pc, 'div', 'pc-ice');
+  mkIn(panels.pc, 'div', 'pc-frost');
+
+  /* 雪花装饰 */
+  [
+    { t:'❄', left:'14px',  top:'14px',   size:'18px' },
+    { t:'❄', right:'16px', top:'26px',   size:'14px' },
+    { t:'❄', left:'24px',  bottom:'42px', size:'16px' },
+    { t:'❄', right:'22px', bottom:'60px', size:'12px' },
+    { t:'❄', left:'50%',   top:'62px',   size:'10px' }
+  ].forEach(function(s){
+    const e = mkIn(panels.pc, 'span', 'snowflake');
+    e.textContent = s.t;
+    e.style.fontSize = s.size;
+    if (s.left)   e.style.left = s.left;
+    if (s.right)  e.style.right = s.right;
+    if (s.top)    e.style.top = s.top;
+    if (s.bottom) e.style.bottom = s.bottom;
+    if (s.left === '50%'){
+      e.style.transform = 'translateX(-50%)';
+      e.style.animationDelay = '0.8s';
+    } else {
+      e.style.animationDelay = (Math.random() * 2).toFixed(2) + 's';
+    }
+  });
+
+  /* 冰冻标签 */
+  const frozenTag = mkIn(panels.pc, 'div', 'frozen-tag');
+  frozenTag.textContent = 'FROZEN';
+
+  /* ============================================================
+     代码面板
+  ============================================================ */
+  mkIn(panels.code, 'div', 'panel-head').textContent = 'MCU 代码';
+
+  const CODE_LINES = [
+    '<span class="kw">uint8_t</span> rxBuffer[<span class="num">4</span>] = {<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>};',
+    '<span class="cmt">/* USER CODE END 2 */</span>',
+    '<span class="kw">while</span> (<span class="num">1</span>)',
+    '{',
+    '  <span class="fn">HAL_UART_Receive</span>(&amp;huart2, rxBuffer, <span class="kw">sizeof</span>(rxBuffer), <span class="num">1000</span>);',
+    '  <span class="fn">HAL_Delay</span>(<span class="num">1</span>);',
+    '}'
+  ];
+  const lineEls = CODE_LINES.map(function(html, i){
+    const d = mkIn(panels.code, 'div', 'code-line', {
+      left: CODE_LX + 'px',
+      right: '20px',
+      top: (CODE_TOP + i * CODE_STEP) + 'px'
+    });
+    d.innerHTML = html;
+    return d;
+  });
+
+  /* ============================================================
+     RDR 面板
+  ============================================================ */
+  mkIn(panels.rdr, 'div', 'panel-head').textContent = '接收数据寄存器 · RDR (8 位)';
+
+  const RDR_SLOT_W   = 20;
+  const RDR_SLOT_GAP = 4;
+  const RDR_SLOT_TOTAL = 8 * RDR_SLOT_W + 7 * RDR_SLOT_GAP;
+  const RDR_SLOT_X0 = (BASE.rdr.w - RDR_SLOT_TOTAL) / 2;
+  const RDR_SLOT_TOP = 50;
+
+  const rdrSlots = [];
+  for (let j = 0; j < 8; j++){
+    const sx = RDR_SLOT_X0 + j * (RDR_SLOT_W + RDR_SLOT_GAP);
+    const s = mkIn(panels.rdr, 'div', 'rdr-slot', {
+      left: sx + 'px',
+      top: RDR_SLOT_TOP + 'px',
+      width: RDR_SLOT_W + 'px',
+      height: RDR_SLOT_W + 'px'
+    });
+    rdrSlots.push(s);
+
+    const tag = mkIn(panels.rdr, 'div', 'rdr-slot-tag', {
+      left: sx + 'px',
+      top: (RDR_SLOT_TOP + RDR_SLOT_W + 2) + 'px',
+      width: RDR_SLOT_W + 'px'
+    });
+    tag.textContent = 'b' + j;
+  }
+
+  const rdrByte = mkIn(panels.rdr, 'div', '', {
+    position:'absolute',
+    left: '50%', top: '105px',
+    transform: 'translateX(-50%)',
+    width: '100px', height: '40px',
+    display:'flex', alignItems:'center', justifyContent:'center',
+    fontFamily:'ui-monospace,monospace',
+    fontSize:'24px', fontWeight:'800',
+    color:'#41597a',
+    border:'2px dashed rgba(120,170,240,.22)',
+    borderRadius:'10px',
+    letterSpacing:'2px',
+    transition:'all .3s ease'
+  });
+  rdrByte.id = 'rdrByte';
+  rdrByte.textContent = '--';
+
+  const rxne = mkIn(panels.rdr, 'div', '', {
+    position:'absolute', left:'50%', top:'158px',
+    transform:'translateX(-50%)',
+    display:'flex', alignItems:'center', gap:'7px',
+    fontFamily:'ui-monospace,monospace',
+    fontSize:'10.5px', color:'#3d5678', letterSpacing:'1.2px'
+  });
+  rxne.id = 'rxne';
+  const rxneLed = mkIn(rxne, 'div', '', {
+    width:'11px', height:'11px', borderRadius:'50%',
+    background:'#28374a'
+  });
+  rxne.appendChild(document.createTextNode('RXNE = 0'));
+
+  /* 超时进度条 */
+  const timeoutBar = mkIn(panels.code, 'div', '', {
+    position:'absolute',
+    left: '80px', top: '300px',
+    width: '300px', height: '12px',
+    background: 'rgba(255,255,255,.04)',
+    border: '1px solid rgba(120,170,240,.22)',
+    borderRadius: '6px',
+    overflow: 'hidden',
+    opacity: '0',
+    transition: 'opacity .4s'
+  });
+  timeoutBar.id = 'timeoutBar';
+  const timeoutFill = mkIn(timeoutBar, 'div', '', {
+    height: '100%',
+    width: '0%',
+    background: 'linear-gradient(90deg,#38bdf8,#0ea5e9)',
+    borderRadius: '5px',
+    transition: 'background .5s'
+  });
+  timeoutFill.id = 'timeoutFill';
+
+  const timeoutText = mkIn(panels.code, 'div', '', {
+    position:'absolute',
+    left: '0', right: '0', top: '322px',
+    textAlign:'center',
+    fontFamily:'ui-monospace,monospace',
+    fontSize:'11px', color:'#7fa3cc', letterSpacing:'.5px',
+    opacity:'0',
+    transition:'opacity .4s, color .3s'
+  });
+  timeoutText.id = 'timeoutText';
+  timeoutText.textContent = '等待数据……';
+
+  /* ============================================================
+     rxBuffer 面板
+  ============================================================ */
+  mkIn(panels.buf, 'div', 'panel-head').textContent = '内存 · rxBuffer[4]';
+
+  const MEM_W = 60, MEM_H = 60, MEM_GAP = 18;
+  const MEM_X0 = (BASE.buf.w - (4 * MEM_W + 3 * MEM_GAP)) / 2;
+  const MEM_TOP = 80;
+  const memSlots = [];
+  for (let i = 0; i < 4; i++){
+    const s = mkIn(panels.buf, 'div', 'mem-slot', {
+      left: (MEM_X0 + i * (MEM_W + MEM_GAP)) + 'px',
+      top: MEM_TOP + 'px',
+      width: MEM_W + 'px', height: MEM_H + 'px'
+    });
+    const v = mkIn(s, 'div', 'val');
+    v.textContent = '0';
+    const idx = mkIn(s, 'div', 'idx');
+    idx.textContent = '[' + i + ']';
+    memSlots.push(s);
+  }
+
+  /* ============================================================
+     CPU & 状态
+  ============================================================ */
+  const cpu = document.getElementById('cpu');
+  const statusEl = document.getElementById('status');
+
+  function cpuLinePos(i){
+    return {
+      x: BASE.code.x + CPU_CODE_LX - CPU_SIZE/2,
+      y: BASE.code.y + CODE_TOP + i * CODE_STEP + 14 - CPU_SIZE/2
+    };
+  }
+
+  function setCpu(x, y){
+    cpu.style.transition = 'none';
+    cpu.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+    void cpu.offsetWidth;
+  }
+  function moveCpu(x, y, dur, ease){
+    dur = dur || 500;
+    ease = ease || 'cubic-bezier(.45,.05,.2,1)';
+    return new Promise(function(res){
+      cpu.style.transition = 'transform ' + dur + 'ms ' + ease + ', opacity .45s ease';
+      void cpu.offsetWidth;
+      cpu.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+      setTimeout(res, dur + 20);
+    });
+  }
+  function cpuToLine(i, dur){
+    const p = cpuLinePos(i);
+    return moveCpu(p.x, p.y, dur || 340);
+  }
+
+  function highlightLine(i){
+    lineEls.forEach(function(l){ l.classList.remove('active','waiting','timeout','done'); });
+    if (i >= 0 && i < lineEls.length) lineEls[i].classList.add('active');
+  }
+  function markWaiting(i){
+    lineEls.forEach(function(l){ l.classList.remove('active','waiting','timeout','done'); });
+    lineEls[i].classList.add('waiting');
+  }
+  function markTimeout(i){
+    lineEls.forEach(function(l){ l.classList.remove('active','waiting','timeout','done'); });
+    lineEls[i].classList.add('timeout');
+  }
+
+  /* ============================================================
+     重置
+  ============================================================ */
+  function resetAll(){
+    for (const k in panels){
+      panels[k].classList.remove('on','listening');
+    }
+
+    lineEls.forEach(function(l){ l.classList.remove('active','waiting','timeout','done'); });
+
+    rdrSlots.forEach(function(s){
+      s.classList.remove('one','zero');
+    });
+    rdrByte.textContent = '--';
+    rdrByte.style.color = '#41597a';
+    rdrByte.style.borderColor = 'rgba(120,170,240,.22)';
+    rdrByte.style.background = 'transparent';
+    rdrByte.style.boxShadow = 'none';
+
+    rxneLed.style.background = '#28374a';
+    rxneLed.style.boxShadow = 'none';
+    Array.from(rxne.childNodes).forEach(function(node){
+      if (node.nodeType === 3) rxne.removeChild(node);
+    });
+    rxne.appendChild(document.createTextNode('RXNE = 0'));
+
+    timeoutBar.style.opacity = '0';
+    timeoutFill.style.width = '0%';
+    timeoutFill.style.background = 'linear-gradient(90deg,#38bdf8,#0ea5e9)';
+    timeoutText.style.opacity = '0';
+    timeoutText.classList.remove('warn');
+    timeoutText.textContent = '等待数据……';
+
+    memSlots.forEach(function(s){
+      s.querySelector('.val').textContent = '0';
+    });
+
+    cpu.classList.remove('visible','alert');
+    while (cpu.firstChild) cpu.removeChild(cpu.firstChild);
+    cpu.textContent = 'CPU';
+
+    statusEl.textContent = '准备中…';
+    statusEl.classList.remove('warn','done');
+  }
+
+  /* ============================================================
+     场景 1：所有面板出现（PC 是冰冻的）
+  ============================================================ */
+  async function sceneShowPanels(){
+    panels.pc.classList.add('on');
+    panels.code.classList.add('on');
+    panels.rdr.classList.add('on');
+    panels.buf.classList.add('on');
+    statusEl.textContent = 'PC 已被冻结 · MCU 单独运行…';
+    await sleep(1100);
+  }
+
+  /* ============================================================
+     场景 2：CPU 逐行执行，停在 HAL_UART_Receive
+  ============================================================ */
+  async function sceneRunCode(){
+    cpu.classList.add('visible');
+    const p0 = cpuLinePos(0);
+    setCpu(p0.x, p0.y);
+    await sleep(500);
+
+    highlightLine(0);
+    await cpuToLine(0, 420);
+    await sleep(700);
+
+    highlightLine(2);
+    await cpuToLine(2, 440);
+    await sleep(520);
+
+    highlightLine(3);
+    await cpuToLine(3, 340);
+    await sleep(400);
+
+    highlightLine(HAL_RECEIVE_LINE);
+    await cpuToLine(HAL_RECEIVE_LINE, 440);
+    await sleep(900);
+
+    statusEl.textContent = '执行 HAL_UART_Receive() → 阻塞等待数据…';
+    await sleep(500);
+  }
+
+  /* ============================================================
+     场景 3：等待 → 超时（6 秒慢速倒计时）
+  ============================================================ */
+  async function sceneWaitAndTimeout(){
+    markWaiting(HAL_RECEIVE_LINE);
+    panels.rdr.classList.add('listening');
+
+    timeoutBar.style.opacity = '1';
+    timeoutText.style.opacity = '1';
+    timeoutText.textContent = '等待数据…… 剩余 1000ms';
+
+    statusEl.textContent = 'CPU 等待数据到达（timeout = 1000ms）…';
+
+    /* 用 6 秒的视觉时长表现 1000ms 的 timeout */
+    const VISUAL_DURATION = 6000;
+    const startTime = performance.now();
+
+    await new Promise(function(resolve){
+      function tick(){
+        const elapsed = performance.now() - startTime;
+        const progress = Math.min(elapsed / VISUAL_DURATION, 1);
+        const remainMs = Math.max(0, Math.round(1000 * (1 - progress)));
+
+        timeoutFill.style.width = (progress * 100) + '%';
+        timeoutText.textContent = '等待数据…… 剩余 ' + remainMs + 'ms';
+
+        if (progress > 0.65){
+          timeoutFill.style.background = 'linear-gradient(90deg,#38bdf8,#f43f5e)';
+        }
+
+        if (progress >= 1){
+          resolve();
+        } else {
+          requestAnimationFrame(tick);
+        }
+      }
+      requestAnimationFrame(tick);
+    });
+
+    /* 超时发生 */
+    panels.rdr.classList.remove('listening');
+
+    timeoutFill.style.width = '100%';
+    timeoutFill.style.background = '#f43f5e';
+    timeoutText.textContent = '⚠ 超时！未收到任何数据';
+    timeoutText.classList.add('warn');
+
+    markTimeout(HAL_RECEIVE_LINE);
+
+    cpu.classList.add('alert');
+    await sleep(650);
+    cpu.classList.remove('alert');
+
+    // 超时提示消失
+    timeoutBar.style.opacity = '0';
+    timeoutText.style.opacity = '0';
+    await sleep(400);
+
+    statusEl.textContent = 'HAL_UART_Receive() 返回 HAL_TIMEOUT';
+    statusEl.classList.add('warn');
+    await sleep(1000);
+  }
+
+  /* ============================================================
+     场景 4：CPU 继续执行
+  ============================================================ */
+  async function sceneContinue(){
+    statusEl.classList.remove('warn');
+    statusEl.textContent = 'CPU 继续执行下一行代码…';
+
+    lineEls[HAL_RECEIVE_LINE].classList.remove('timeout');
+    lineEls[HAL_RECEIVE_LINE].classList.add('done');
+    await sleep(400);
+
+    highlightLine(5);
+    await cpuToLine(5, 400);
+    await sleep(560);
+
+    highlightLine(6);
+    await cpuToLine(6, 340);
+    await sleep(420);
+
+    highlightLine(2);
+    await cpuToLine(2, 440);
+    await sleep(500);
+
+    statusEl.textContent = '✓ rxBuffer = { 0, 0, 0, 0 } · 循环继续';
+    statusEl.classList.add('done');
+  }
+
+  /* ============================================================
+     主流程
+  ============================================================ */
+  let running = false;
+
+  async function run(){
+    if (running) return;
+    running = true;
+
+    try {
+      resetAll();
+      await sleep(600);
+
+      await sceneShowPanels();
+      await sceneRunCode();
+      await sceneWaitAndTimeout();
+      await sceneContinue();
+
+    } catch(err){
+      console.error(err);
+      statusEl.textContent = '出错：' + err.message;
+    }
+
+    running = false;
+  }
+
+  function fit(){
+    let s = Math.min(window.innerWidth / 1240, window.innerHeight / 760, 1.3);
+    if (s < 0.3) s = 0.3;
+    stage.style.transform = 'scale(' + s + ')';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  document.getElementById('replay').addEventListener('click', function(){
+    if (running) return;
+    run();
+  });
+
+  setTimeout(run, 700);
+
+})();
+</script>
+</body>
+</html>

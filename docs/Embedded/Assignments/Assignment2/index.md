@@ -29,6 +29,8 @@
 
 本次作业向各位提供一个基础的template代码，里面已经在cubemx配好了CAN的基础参数，同时在已经修改了makefile，使得其可以编译CPP代码。
 
+模板工程： [打开 Assignment 2 模板工程下载页面](https://drive.google.com/drive/folders/1BrsuL7x3yB2OBq_NmCC-_-eEI_B_xNiT?usp=drive_link)
+
 ### 1. DJIMotor.hpp
 
 - `getFilter`：通过传入 filterID 和 filterMaskID 构造 CAN 接收的 filter

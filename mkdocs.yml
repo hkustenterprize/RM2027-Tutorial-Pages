@@ -55,6 +55,7 @@ nav:
       - 课程: /Embedded/#courses
       - 作业:
           - "作业 1": Embedded/Assignments/Assignment1/index.md
+          - "作业 2": Embedded/Assignments/Assignment2/index.md
 
 markdown_extensions:
   - attr_list

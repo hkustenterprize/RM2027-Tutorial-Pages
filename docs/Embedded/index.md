@@ -31,9 +31,8 @@
 | Tutorial 4：CAN Communication | [PPT](https://drive.google.com/drive/folders/1a9dzMYux6DID3ckUof13KxmAMgs7sUzC?usp=drive_link) |
 | Tutorial 5：Control & PID | [PPT & Template](https://drive.google.com/drive/folders/1IYNPPKZhDktt1x0LAvl82ve-gzqShWJt?usp=drive_link) |
 | Tutorial 6：Clock & Timer & PWM | [PPT](https://drive.google.com/drive/folders/10qTFk3EfvK6kUb6KxoNQUj0eGSXcNe_9?usp=drive_link) |
-| Tutorial 7：FreeRTOS | [Video](https://www.bilibili.com/video/BV1Pgam69EKu/?share_source=copy_web&vd_source=bd3c0716a6b656e5dd5b3f90bb7eebce)<br>[PPT & Template](https://drive.google.com/drive/folders/1AJIxtMBUwc1ZMw95gxH1SKSdRQ8Nastm?usp=sharing) |
-| Tutorial 8：Git & Github | [Video](https://www.bilibili.com/video/BV1mcam6fEv8/?share_source=copy_web&vd_source=bd3c0716a6b656e5dd5b3f90bb7eebce)<br>[PPT](https://drive.google.com/drive/folders/1TbKs4GgEYp7nEPEDnCbnc9EJ0CLfqKEg?usp=sharing) |
-
+| Tutorial 7：FreeRTOS | [Video](https://www.bilibili.com/video/BV1mcam6fEv8/?share_source=copy_web&vd_source=bd3c0716a6b656e5dd5b3f90bb7eebce)<br>[PPT & Template](https://drive.google.com/drive/folders/1AJIxtMBUwc1ZMw95gxH1SKSdRQ8Nastm?usp=sharing) |
+| Tutorial 8：Git & Github | [Video](https://www.bilibili.com/video/BV1Pgam69EKu/?share_source=copy_web&vd_source=bd3c0716a6b656e5dd5b3f90bb7eebce)<br>[PPT](https://drive.google.com/drive/folders/1TbKs4GgEYp7nEPEDnCbnc9EJ0CLfqKEg?usp=sharing) |
 
 
 ## 作业
